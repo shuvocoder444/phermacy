@@ -71,19 +71,19 @@ def ensure_default_subscription_plans() -> list[SubscriptionPlan]:
 
     created_or_found = []
     for p in plans_config:
-        plan, _ = SubscriptionPlan.objects.get_or_create(
-            tier=p["tier"],
-            defaults={
-                "name": p["name"],
-                "monthly_price_bdt": p["monthly_price_bdt"],
-                "yearly_price_bdt": p["yearly_price_bdt"],
-                "max_branches": p["max_branches"],
-                "max_users": p["max_users"],
-                "sms_bundle_included": p["sms_bundle_included"],
-                "features": p["features"],
-                "is_active": True,
-            }
-        )
+        plan = SubscriptionPlan.objects.filter(tier=p["tier"]).first()
+        if not plan:
+            plan = SubscriptionPlan.objects.create(
+                tier=p["tier"],
+                name=p["name"],
+                monthly_price_bdt=p["monthly_price_bdt"],
+                yearly_price_bdt=p["yearly_price_bdt"],
+                max_branches=p["max_branches"],
+                max_users=p["max_users"],
+                sms_bundle_included=p["sms_bundle_included"],
+                features=p["features"],
+                is_active=True,
+            )
         created_or_found.append(plan)
     return created_or_found
 
