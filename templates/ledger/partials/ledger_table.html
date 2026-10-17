@@ -1,0 +1,119 @@
+<div id="ledger-content-area" class="space-y-6">
+    
+    <!-- Top Summary Stat Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <!-- Income Card -->
+        <div class="p-5 rounded-3xl bg-white border border-slate-200 shadow-sm flex items-center justify-between">
+            <div>
+                <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">আজকের মোট আয় (Income)</span>
+                <div class="text-2xl font-black text-emerald-600 font-mono mt-1">৳{{ today_income }}</div>
+            </div>
+            <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-black text-xl border border-emerald-100">
+                ↓
+            </div>
+        </div>
+
+        <!-- Expense Card -->
+        <div class="p-5 rounded-3xl bg-white border border-slate-200 shadow-sm flex items-center justify-between">
+            <div>
+                <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">আজকের মোট ব্যয় (Expense)</span>
+                <div class="text-2xl font-black text-rose-600 font-mono mt-1">৳{{ today_expense }}</div>
+            </div>
+            <div class="w-12 h-12 rounded-2xl bg-rose-50 text-rose-700 flex items-center justify-center font-black text-xl border border-rose-100">
+                ↑
+            </div>
+        </div>
+
+        <!-- Net Balance Card -->
+        <div class="p-5 rounded-3xl bg-white border border-slate-200 shadow-sm flex items-center justify-between">
+            <div>
+                <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">আজকের নিট ক্যাশ (Net Cash)</span>
+                <div class="text-2xl font-black {% if today_net >= 0 %}text-cyan-700{% else %}text-rose-700{% endif %} font-mono mt-1">
+                    ৳{{ today_net }}
+                </div>
+            </div>
+            <div class="w-12 h-12 rounded-2xl bg-cyan-50 text-cyan-700 flex items-center justify-center font-black text-xl border border-cyan-100">
+                ৳
+            </div>
+        </div>
+    </div>
+
+    <!-- Ledger Records Table -->
+    <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="p-5 border-b border-slate-100 flex items-center justify-between">
+            <h3 class="font-bold text-slate-800 text-base flex items-center space-x-2">
+                <span>সাম্প্রতিক লেনদেন তালিকা (Recent Transactions)</span>
+                <span class="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-mono font-bold">{{ entries|length }} এন্ট্রি</span>
+            </h3>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs text-slate-600">
+                <thead class="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider border-b border-slate-200">
+                    <tr>
+                        <th class="p-4">তারিখ (Date)</th>
+                        <th class="p-4">টাইপ (Type)</th>
+                        <th class="p-4">খাত / ক্যাটাগরি (Category)</th>
+                        <th class="p-4">বিবরণ (Description)</th>
+                        <th class="p-4">পেমেন্ট মাধ্যম (Method)</th>
+                        <th class="p-4 text-right">পরিমাণ (Amount ৳)</th>
+                        <th class="p-4 text-center">মুছুন</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 font-medium">
+                    {% for entry in entries %}
+                    <tr class="hover:bg-slate-50/80 transition-colors">
+                        <td class="p-4 font-mono font-bold text-slate-500">{{ entry.entry_date|date:"d M, Y" }}</td>
+                        <td class="p-4">
+                            {% if entry.entry_type == 'INCOME' %}
+                            <span class="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 text-[11px] font-bold">
+                                + আয় (Income)
+                            </span>
+                            {% else %}
+                            <span class="px-2.5 py-1 rounded-lg bg-rose-50 text-rose-800 border border-rose-200 text-[11px] font-bold">
+                                - ব্যয় (Expense)
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td class="p-4">
+                            <span class="font-bold text-slate-800">{{ entry.category.name_bn|default:entry.category.name }}</span>
+                        </td>
+                        <td class="p-4">
+                            <div class="text-slate-800 font-semibold">{{ entry.title }}</div>
+                            {% if entry.recipient_or_payer %}<div class="text-[11px] text-slate-400">প্রতিষ্ঠান/ব্যক্তি: {{ entry.recipient_or_payer }}</div>{% endif %}
+                        </td>
+                        <td class="p-4">
+                            <span class="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 text-[11px] font-mono font-bold">
+                                {{ entry.get_payment_method_display }}
+                            </span>
+                        </td>
+                        <td class="p-4 text-right font-mono font-black text-sm {% if entry.entry_type == 'INCOME' %}text-emerald-700{% else %}text-rose-700{% endif %}">
+                            {% if entry.entry_type == 'INCOME' %}+{% else %}-{% endif %}৳{{ entry.amount }}
+                        </td>
+                        <td class="p-4 text-center">
+                            <button 
+                                type="button"
+                                hx-post="{% url 'ledger:delete_entry' entry.id %}"
+                                hx-confirm="আপনি কি এই এন্ট্রিটি মুছে ফেলতে চান?"
+                                hx-target="#ledger-content-area"
+                                hx-swap="outerHTML"
+                                class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                                title="Delete Entry">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                            </button>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="p-8 text-center text-slate-400">
+                            কোন আয় বা ব্যয়ের এন্ট্রি পাওয়া যায়নি। উপরের বাটনে ক্লিক করে নতুন এন্ট্রি যুক্ত করুন।
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

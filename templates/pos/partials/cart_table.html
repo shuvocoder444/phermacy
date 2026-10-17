@@ -1,0 +1,222 @@
+<div id="cart-container" class="flex-1 flex flex-col min-h-0 relative bg-white">
+    
+    <!-- Voice Success Banner / Notification -->
+    {% if voice_success %}
+    <div 
+        x-data="{ show: true }" 
+        x-show="show" 
+        x-init="
+            try {
+                let msg = new SpeechSynthesisUtterance('{{ voice_success.medicine }} {{ voice_success.quantity }} টি যোগ করা হয়েছে');
+                msg.lang = 'bn-BD';
+                window.speechSynthesis.speak(msg);
+            } catch(e){}
+            setTimeout(() => show = false, 4000);
+        "
+        x-transition
+        class="absolute top-2 left-4 right-4 z-40 bg-emerald-600 text-white px-4 py-2.5 rounded-2xl font-bold text-xs shadow-xl flex items-center justify-between">
+        <div class="flex items-center space-x-2">
+            <span class="text-base">🎙️</span>
+            <span>ভয়েস কমান্ড সফল: <strong>{{ voice_success.medicine }}</strong> ({{ voice_success.quantity }} পিস) কার্টে যুক্ত হয়েছে!</span>
+        </div>
+        <button @click="show = false" class="text-white font-black hover:opacity-80">✕</button>
+    </div>
+    {% endif %}
+
+    <!-- Table Header (Desktop/Tablet) -->
+    <div class="hidden sm:grid sm:grid-cols-12 gap-2 px-5 py-3 bg-slate-50 border-b border-slate-200 text-xs font-bold uppercase tracking-wider text-slate-500 select-none">
+        <div class="col-span-5">ঔষধের নাম (Medicine / Generic)</div>
+        <div class="col-span-2 text-center">ব্যাচ ও মেয়াদ (FEFO)</div>
+        <div class="col-span-2 text-center">পরিমাণ (Qty)</div>
+        <div class="col-span-1 text-right">MRP (৳)</div>
+        <div class="col-span-1 text-right">মোট (৳)</div>
+        <div class="col-span-1 text-center">মুছুন</div>
+    </div>
+
+    <!-- Items Scrollable Area -->
+    <div class="flex-1 overflow-y-auto divide-y divide-slate-100 min-h-0 bg-white p-2 sm:p-0">
+        {% if cart.items %}
+            {% for item in cart.items %}
+            <!-- Desktop Row -->
+            <div class="hidden sm:grid sm:grid-cols-12 gap-2 px-5 py-3.5 items-center hover:bg-slate-50/80 transition-colors group">
+                <!-- Drug Name -->
+                <div class="col-span-5">
+                    <div class="flex items-center space-x-2">
+                        <span class="font-bold text-slate-900 text-sm">{{ item.brand_name }}</span>
+                        <span class="text-xs px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200 font-mono font-bold">{{ item.strength }}</span>
+                        <span class="text-xs text-slate-500 font-medium">({{ item.dosage_form }})</span>
+                    </div>
+                </div>
+
+                <!-- Batch / Expiry -->
+                <div class="col-span-2 text-center">
+                    <div class="text-xs font-mono font-bold text-slate-700">{{ item.batch_number }}</div>
+                    <div class="text-[11px] text-amber-600 font-mono font-semibold">Exp: {{ item.expiry_date }}</div>
+                </div>
+
+                <!-- Quantity Controls -->
+                <div class="col-span-2 flex items-center justify-center space-x-1.5">
+                    <button 
+                        type="button" 
+                        hx-post="{% url 'pos:cart_update' %}" 
+                        hx-vals='{"batch_id": "{{ item.batch_id }}", "quantity": {{ item.quantity|add:"-1" }} }'
+                        hx-target="#cart-container"
+                        hx-swap="outerHTML"
+                        class="w-7 h-7 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold flex items-center justify-center transition-colors shadow-sm active:scale-95">
+                        -
+                    </button>
+                    
+                    <input 
+                        type="number" 
+                        value="{{ item.quantity }}" 
+                        min="1" 
+                        max="{{ item.max_stock }}"
+                        hx-post="{% url 'pos:cart_update' %}" 
+                        hx-vals='{"batch_id": "{{ item.batch_id }}"}'
+                        hx-trigger="change"
+                        name="quantity"
+                        hx-target="#cart-container"
+                        hx-swap="outerHTML"
+                        class="w-12 h-7 bg-white border border-slate-300 rounded-xl text-center text-sm font-black font-mono text-emerald-700 focus:border-emerald-500 focus:outline-none shadow-inner">
+                    
+                    <button 
+                        type="button" 
+                        hx-post="{% url 'pos:cart_update' %}" 
+                        hx-vals='{"batch_id": "{{ item.batch_id }}", "quantity": {{ item.quantity|add:"1" }} }'
+                        hx-target="#cart-container"
+                        hx-swap="outerHTML"
+                        {% if item.quantity >= item.max_stock %}disabled class="w-7 h-7 rounded-xl bg-slate-100 text-slate-400 font-bold flex items-center justify-center cursor-not-allowed"{% else %}class="w-7 h-7 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold flex items-center justify-center transition-colors shadow-sm active:scale-95"{% endif %}>
+                        +
+                    </button>
+                </div>
+
+                <!-- MRP -->
+                <div class="col-span-1 text-right font-mono font-bold text-slate-600 text-sm">
+                    ৳{{ item.unit_mrp }}
+                </div>
+
+                <!-- Line Total -->
+                <div class="col-span-1 text-right font-mono font-black text-emerald-700 text-sm">
+                    ৳{{ item.line_total }}
+                </div>
+
+                <!-- Delete Item -->
+                <div class="col-span-1 text-center">
+                    <button 
+                        type="button" 
+                        hx-post="{% url 'pos:cart_remove' %}" 
+                        hx-vals='{"batch_id": "{{ item.batch_id }}"}'
+                        hx-target="#cart-container"
+                        hx-swap="outerHTML"
+                        class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                        title="Remove item">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Mobile Card View (for iPhone & Android) -->
+            <div class="sm:hidden p-3 bg-white rounded-2xl border border-slate-100 mb-2 shadow-sm space-y-2.5">
+                <div class="flex items-start justify-between">
+                    <div>
+                        <div class="font-bold text-slate-900 text-sm">{{ item.brand_name }}</div>
+                        <div class="flex items-center gap-1.5 mt-0.5">
+                            <span class="text-[11px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-mono font-semibold">{{ item.strength }}</span>
+                            <span class="text-[11px] text-slate-500 font-medium">({{ item.dosage_form }})</span>
+                        </div>
+                    </div>
+                    <button 
+                        type="button" 
+                        hx-post="{% url 'pos:cart_remove' %}" 
+                        hx-vals='{"batch_id": "{{ item.batch_id }}"}'
+                        hx-target="#cart-container"
+                        hx-swap="outerHTML"
+                        class="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="flex items-center justify-between pt-1 border-t border-slate-50 text-xs">
+                    <div class="text-[11px] text-amber-600 font-mono">
+                        Exp: {{ item.expiry_date }}
+                    </div>
+
+                    <!-- Mobile Quantity Buttons -->
+                    <div class="flex items-center space-x-2">
+                        <button 
+                            type="button" 
+                            hx-post="{% url 'pos:cart_update' %}" 
+                            hx-vals='{"batch_id": "{{ item.batch_id }}", "quantity": {{ item.quantity|add:"-1" }} }'
+                            hx-target="#cart-container"
+                            hx-swap="outerHTML"
+                            class="w-8 h-8 rounded-xl bg-slate-100 active:bg-slate-200 text-slate-800 font-bold flex items-center justify-center text-sm shadow-sm">
+                            -
+                        </button>
+                        <span class="w-8 text-center font-bold text-sm font-mono text-emerald-700">{{ item.quantity }}</span>
+                        <button 
+                            type="button" 
+                            hx-post="{% url 'pos:cart_update' %}" 
+                            hx-vals='{"batch_id": "{{ item.batch_id }}", "quantity": {{ item.quantity|add:"1" }} }'
+                            hx-target="#cart-container"
+                            hx-swap="outerHTML"
+                            {% if item.quantity >= item.max_stock %}disabled class="w-8 h-8 rounded-xl bg-slate-100 text-slate-400 font-bold flex items-center justify-center text-sm"{% else %}class="w-8 h-8 rounded-xl bg-slate-100 active:bg-slate-200 text-slate-800 font-bold flex items-center justify-center text-sm shadow-sm"{% endif %}>
+                            +
+                        </button>
+                    </div>
+
+                    <!-- Line total -->
+                    <div class="text-right">
+                        <div class="text-[10px] text-slate-400">@ ৳{{ item.unit_mrp }}</div>
+                        <div class="font-black text-emerald-700 text-sm font-mono">৳{{ item.line_total }}</div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <!-- Empty Cart State -->
+            <div class="h-64 flex flex-col items-center justify-center text-slate-400">
+                <div class="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center text-2xl mb-3 text-slate-400">
+                    🛒
+                </div>
+                <p class="text-base font-bold text-slate-700">কার্টটি বর্তমানে খালি রয়েছে</p>
+                <p class="text-xs text-slate-500 mt-1 text-center px-4">
+                    সার্চবারে নাম লিখে খুঁজুন অথবা 🎙️ ভয়েস বাটনে চাপ দিয়ে মুখে বলুন
+                </p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+{% if is_htmx %}
+<!-- HTMX Out-Of-Band (OOB) Synchronized Updates for Real-Time Billing & Badges -->
+<div id="pos-bill-summary-card" hx-swap-oob="true" class="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200 shadow-sm space-y-3">
+    <div class="flex items-center justify-between text-xs text-slate-500 font-medium">
+        <span>সাব-টোটাল (Sub Total)</span>
+        <span class="font-mono text-slate-700 font-bold" id="cart-subtotal">৳{{ cart.subtotal|default:cart.subtotal_mrp|default:"0.00" }}</span>
+    </div>
+    
+    <div class="flex items-center justify-between text-xs text-slate-500 font-medium">
+        <span>ছাড় (Discount)</span>
+        <span class="font-mono text-rose-600 font-bold" id="cart-discount">-৳{{ cart.total_discount|default:cart.discount_amount|default:"0.00" }}</span>
+    </div>
+
+    <div class="flex items-center justify-between text-xs text-slate-500 font-medium">
+        <span>ভ্যাট (VAT {% if cart.vat_percent and cart.vat_percent != '0.00' %}{{ cart.vat_percent }}%{% else %}0%{% endif %})</span>
+        <span class="font-mono text-slate-700 font-bold" id="cart-vat">৳{{ cart.vat_amount|default:"0.00" }}</span>
+    </div>
+
+    <div class="pt-3 border-t-2 border-dashed border-slate-200 flex items-center justify-between">
+        <span class="text-sm font-extrabold text-slate-900">সর্বমোট (Net Total)</span>
+        <span class="text-2xl font-black text-emerald-600 font-mono tracking-tight" id="cart-grand-total">৳{{ cart.grand_total|default:cart.total_payable|default:"0.00" }}</span>
+    </div>
+</div>
+
+<strong class="text-emerald-600 font-bold" id="total-items-badge" hx-swap-oob="true">{{ cart.total_items_count|default:0 }}</strong>
+<span class="font-mono font-black text-lg" id="cart-btn-grand-total" hx-swap-oob="true">৳{{ cart.grand_total|default:cart.total_payable|default:"0.00" }}</span>
+<span class="text-lg font-black text-emerald-600 font-mono" id="cart-mobile-grand-total" hx-swap-oob="true">৳{{ cart.grand_total|default:cart.total_payable|default:"0.00" }}</span>
+<span id="cart-mobile-items-count" hx-swap-oob="true">{{ cart.total_items_count|default:0 }}</span>
+{% endif %}

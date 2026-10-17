@@ -1,0 +1,162 @@
+{% if detected_drugs %}
+<div class="space-y-3 p-1 sm:p-2">
+    <!-- Big Prominent Detected Medicine Card with Instant "Send to Search Bar" Action -->
+    <div class="p-3.5 sm:p-4 bg-gradient-to-r from-emerald-50 via-teal-50 to-cyan-50 border-2 border-emerald-500 rounded-2xl shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div class="flex items-center space-x-3 min-w-0">
+            <div class="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-emerald-500/15 border border-emerald-500/20 text-emerald-700 flex items-center justify-center text-xl shrink-0 shadow-sm">
+                💊
+            </div>
+            <div class="min-w-0 flex-1">
+                <div class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">শনাক্তকৃত মূল ঔষধের নাম:</div>
+                <div class="text-base sm:text-lg font-black text-emerald-950 font-mono tracking-tight leading-snug break-words">
+                    {{ primary_brand_name|default:detected_drugs.0.brand_name }}
+                </div>
+            </div>
+        </div>
+        <button 
+            type="button" 
+            onclick="sendDetectedToSearch('{{ primary_brand_name|default:detected_drugs.0.brand_name|escapejs }}')"
+            @click="sendDetectedToSearch('{{ primary_brand_name|default:detected_drugs.0.brand_name|escapejs }}')"
+            class="w-full sm:w-auto px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-extrabold rounded-xl text-xs sm:text-sm shadow-md shadow-emerald-600/30 flex items-center justify-center space-x-2 transition-all active:scale-95 shrink-0"
+            title="এই নামটি সরাসরি মূল সার্চ বারে বসিয়ে সব ভ্যারিয়েন্ট ও ফর্ম দেখুন">
+            <span>🔍 মূল সার্চ বারে পাঠান</span>
+            <span>➔</span>
+        </button>
+    </div>
+
+    <!-- Engine Badge and Meta Info -->
+    <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500 px-1 pb-1 border-b border-slate-200">
+        <div class="flex flex-wrap items-center gap-2">
+            <span class="text-emerald-700 font-extrabold text-xs">✓ {{ detected_drugs|length }}টি ভ্যারিয়েন্ট পাওয়া গেছে</span>
+            {% if ai_engine == "gemini" %}
+            <span class="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-bold flex items-center gap-1 shadow-sm">
+                <span>✨</span> Gemini AI Vision
+            </span>
+            {% elif ai_engine == "trained" %}
+            <span class="px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 text-[10px] font-bold flex items-center gap-1 shadow-sm">
+                <span>🎓</span> কাস্টম ট্রেইনিং ম্যাচ
+            </span>
+            {% else %}
+            <span class="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold flex items-center gap-1 shadow-sm">
+                <span>⚡</span> লোকাল ইঞ্জিন
+            </span>
+            {% endif %}
+        </div>
+        <span class="truncate max-w-[160px] sm:max-w-[220px] text-slate-400 font-mono text-[10px]">"{{ raw_text }}"</span>
+    </div>
+
+    <!-- Matching Drugs List with 1-Click Add (Responsive Mobile-First Cards) -->
+    <div class="space-y-2.5">
+        {% for drug in detected_drugs %}
+        <div class="p-3 sm:p-3.5 bg-white hover:bg-emerald-50/40 rounded-2xl border border-slate-200 hover:border-emerald-500 shadow-sm transition-all space-y-2 sm:space-y-0 sm:flex sm:items-center sm:justify-between sm:gap-3">
+            
+            <!-- Drug Details -->
+            <div class="flex items-start space-x-2.5 sm:space-x-3 min-w-0 flex-1">
+                <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-emerald-100 text-emerald-800 font-black text-xs flex items-center justify-center shrink-0 mt-0.5 uppercase shadow-xs">
+                    {{ drug.dosage_form|default:"MED"|slice:":3" }}
+                </div>
+                <div class="min-w-0 flex-1">
+                    <div class="flex flex-wrap items-center gap-1.5 leading-snug">
+                        <span class="font-extrabold text-slate-900 text-sm sm:text-base">{{ drug.brand_name }}</span>
+                        {% if drug.strength %}
+                        <span class="text-[10px] sm:text-[11px] px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 font-mono font-bold">{{ drug.strength }}</span>
+                        {% endif %}
+                        {% if drug.score %}
+                        <span class="text-[9px] sm:text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-mono font-bold">{{ drug.score }}% মিল</span>
+                        {% endif %}
+                    </div>
+                    <div class="text-[11px] sm:text-xs text-slate-500 mt-1 truncate">
+                        <span class="text-emerald-700 font-bold">{{ drug.generic_name }}</span> • {{ drug.manufacturer }}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Price, Stock & Action Button (Mobile-first responsive row) -->
+            <div class="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t border-slate-100 sm:border-t-0 shrink-0">
+                <div class="text-left sm:text-right">
+                    <div class="text-base sm:text-sm font-black text-emerald-700 font-mono leading-none">৳{{ drug.unit_mrp }}</div>
+                    <div class="text-[10px] sm:text-[11px] text-slate-500 font-bold mt-1">
+                        স্টক: <span class="{% if drug.total_stock > 0 %}text-slate-800{% else %}text-rose-600{% endif %} font-mono">{{ drug.total_stock }}</span>
+                    </div>
+                </div>
+                
+                {% if drug.fefo_batch %}
+                <button 
+                    type="button"
+                    onclick="addScannedDrugToCart('{{ drug.fefo_batch.id }}')"
+                    @click="addDrugBatch('{{ drug.fefo_batch.id }}'); cameraModalOpen = false; stopCamera();"
+                    class="px-4 py-2 sm:px-3.5 sm:py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-extrabold text-xs sm:text-sm shadow-md shadow-emerald-600/25 flex items-center space-x-1.5 transition-all shrink-0">
+                    <span>➕</span>
+                    <span>কার্টে যোগ</span>
+                </button>
+                {% else %}
+                <span class="text-xs text-rose-700 font-bold px-3 py-1.5 rounded-xl bg-rose-50 border border-rose-200 shrink-0">স্টক নেই</span>
+                {% endif %}
+            </div>
+
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% else %}
+<div class="p-3 sm:p-5 text-center text-slate-600 bg-white rounded-2xl border border-slate-200 space-y-3">
+    {% if primary_brand_name %}
+    <div class="p-3.5 sm:p-4 bg-gradient-to-r from-emerald-50 via-teal-50 to-cyan-50 border-2 border-emerald-500 rounded-2xl shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 text-left">
+        <div class="flex items-center space-x-3 min-w-0">
+            <div class="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-emerald-500/15 border border-emerald-500/20 text-emerald-700 flex items-center justify-center text-xl shrink-0">
+                💊
+            </div>
+            <div class="min-w-0 flex-1">
+                <div class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">শনাক্তকৃত মূল ঔষধের নাম:</div>
+                <div class="text-base sm:text-lg font-black text-emerald-950 font-mono tracking-tight leading-snug break-words">
+                    {{ primary_brand_name }}
+                </div>
+            </div>
+        </div>
+        <button 
+            type="button" 
+            onclick="sendDetectedToSearch('{{ primary_brand_name|escapejs }}')"
+            @click="sendDetectedToSearch('{{ primary_brand_name|escapejs }}')"
+            class="w-full sm:w-auto px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-extrabold rounded-xl text-xs sm:text-sm shadow-md shadow-emerald-600/30 flex items-center justify-center space-x-2 transition-all active:scale-95 shrink-0"
+            title="এই নামটি সরাসরি মূল সার্চ বারে বসিয়ে সব ভ্যারিয়েন্ট ও ফর্ম দেখুন">
+            <span>🔍 মূল সার্চ বারে পাঠান</span>
+            <span>➔</span>
+        </button>
+    </div>
+    {% endif %}
+
+    <div class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200 mx-auto flex items-center justify-center text-2xl shadow-sm">
+        🔍
+    </div>
+    <div>
+        <p class="font-extrabold text-slate-800 text-sm sm:text-base">সরাসরি স্টক ভ্যারিয়েন্ট পাওয়া যায়নি</p>
+        <p class="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+            নিচের "সার্চ করুন" বাটনে ক্লিক করে মূল ক্যাটালগ থেকে যোগ করুন অথবা AI কে শেখান।
+        </p>
+    </div>
+
+    <div class="p-3 bg-slate-100 rounded-xl text-[11px] text-slate-700 font-mono break-words text-left max-w-md mx-auto border border-slate-200">
+        <strong class="text-slate-800">স্ক্যান করা টেক্সট:</strong> <br>
+        <span class="text-slate-900 font-bold">{{ raw_text|default:"কোনো স্পষ্ট টেক্সট রিড করা যায়নি!" }}</span>
+    </div>
+
+    {% if raw_text and raw_text != "কোনো টেক্সট রিড করা যায়নি" and raw_text != "কোনো টেক্সট পাওয়া যায়নি!" %}
+    <div class="flex flex-col sm:flex-row items-center justify-center gap-2 pt-2 max-w-md mx-auto">
+        <button 
+            type="button" 
+            onclick="sendDetectedToSearch('{{ primary_brand_name|default:raw_text|escapejs }}')"
+            @click="sendDetectedToSearch('{{ primary_brand_name|default:raw_text|escapejs }}')"
+            class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow-md transition-all flex items-center justify-center space-x-1.5 active:scale-95">
+            <span>🔍 এই লেখা দিয়ে সার্চ করুন</span>
+        </button>
+        <button 
+            type="button" 
+            onclick="openTrainModalFromScan('{{ raw_text|escapejs }}')"
+            @click="openTrainModal('{{ raw_text|escapejs }}')"
+            class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-xs shadow-md transition-all flex items-center justify-center space-x-1.5 active:scale-95">
+            <span>🎓 AI কে ঔষধ শেখান</span>
+        </button>
+    </div>
+    {% endif %}
+</div>
+{% endif %}

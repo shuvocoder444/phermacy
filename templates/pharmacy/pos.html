@@ -1,0 +1,46 @@
+{% extends "pharmacy/base.html" %}
+{% block title %}Point of Sale · {{ tenant.name }}{% endblock %}
+{% block content %}
+<main class="mx-auto max-w-screen-2xl p-4 lg:p-6" x-data="posKeys()">
+  <header class="mb-5 flex items-center justify-between">
+    <div><h1 class="text-2xl font-bold">{{ tenant.name }} · Point of Sale</h1>
+      <p class="text-sm text-slate-500">F2 search · F4 discount · Enter to checkout</p></div>
+    <form method="post" action="{% url 'logout' %}">{% csrf_token %}
+      <button class="text-sm text-slate-600 underline">Sign out</button>
+    </form>
+  </header>
+  <div class="grid gap-5 lg:grid-cols-[1.35fr_1fr]">
+    <section class="rounded-xl bg-white p-4 shadow-sm">
+      <label for="medicine-search" class="mb-2 block font-semibold">Find medicine</label>
+      <input id="medicine-search" autofocus name="q" type="search"
+        placeholder="Brand, generic or বাংলায় খুঁজুন"
+        class="w-full rounded-lg border border-slate-300 px-4 py-3 text-lg"
+        hx-get="{% url 'pos_search' %}" hx-trigger="input changed delay:150ms, search"
+        hx-target="#search-results" hx-swap="innerHTML">
+      <div id="search-results" class="mt-3" hx-get="{% url 'pos_search' %}"
+        hx-trigger="load" hx-swap="innerHTML"></div>
+    </section>
+    <section id="cart" class="rounded-xl bg-white p-4 shadow-sm">
+      {% include "pharmacy/partials/cart.html" %}
+    </section>
+  </div>
+</main>
+<script>
+function posKeys() {
+  return {
+    init() {
+      window.addEventListener("keydown", (event) => {
+        if (event.key === "F2") {
+          event.preventDefault();
+          document.querySelector("#medicine-search").focus();
+        }
+        if (event.key === "F4") {
+          event.preventDefault();
+          document.querySelector("#discount-value")?.focus();
+        }
+      });
+    }
+  };
+}
+</script>
+{% endblock %}

@@ -1,0 +1,49 @@
+<div class="p-6 space-y-4">
+    <div class="flex items-center justify-between pb-3 border-b border-slate-200">
+        <div class="flex items-center space-x-2">
+            <span class="text-xl">📂</span>
+            <h3 class="text-base font-extrabold text-slate-800">স্থগিত / সংরক্ষিত কার্টসমূহ (Held Carts)</h3>
+        </div>
+        <button onclick="document.getElementById('held-carts-modal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 font-bold text-xl leading-none">&times;</button>
+    </div>
+
+    <div class="space-y-2 max-h-80 overflow-y-auto">
+        {% for h in held_carts %}
+        <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 hover:border-emerald-400 transition-all flex items-center justify-between">
+            <div class="space-y-0.5">
+                <div class="text-xs font-black text-slate-800 flex items-center space-x-2">
+                    <span>{{ h.title }}</span>
+                    <span class="px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 text-[10px] font-mono font-bold">{{ h.items_count }} টি আইটেম</span>
+                </div>
+                <div class="text-[11px] text-slate-500 font-mono">
+                    সময়: {{ h.time }} • মোট: <strong class="text-emerald-700">৳{{ h.total }}</strong>
+                </div>
+            </div>
+
+            <button 
+                type="button" 
+                hx-post="{% url 'pos:resume_cart' hold_id=h.id %}"
+                hx-target="#cart-container"
+                hx-swap="outerHTML"
+                onclick="document.getElementById('held-carts-modal').classList.add('hidden')"
+                class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs shadow-md shadow-emerald-600/25 active:scale-95 transition-all flex items-center space-x-1">
+                <span>▶️</span>
+                <span>রিস্টোর করুন</span>
+            </button>
+        </div>
+        {% empty %}
+        <div class="py-8 text-center text-slate-400">
+            <div class="text-2xl mb-1">🛒</div>
+            <p class="font-bold text-xs text-slate-600">বর্তমানে কোনো স্থগিত কার্ট সংরক্ষিত নেই।</p>
+            <p class="text-[11px] text-slate-400 mt-0.5">কার্টে ঔষধ থাকা অবস্থায় '⏸️ হোল্ড কার্ট' বাটনে ক্লিক করলে এখানে জমা থাকবে।</p>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="pt-3 border-t border-slate-100 flex justify-end">
+        <button onclick="document.getElementById('held-carts-modal').classList.add('hidden')" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold">
+            বন্ধ করুন
+        </button>
+    </div>
+</div>
+

@@ -1,0 +1,21 @@
+<script>
+// Pull to refresh logic for Mobile
+let touchstartY = 0;
+let touchendY = 0;
+const pTreshold = 100;
+document.addEventListener('touchstart', e => {
+    if (window.scrollY === 0) {
+        touchstartY = e.changedTouches[0].screenY;
+    }
+}, {passive: true});
+document.addEventListener('touchend', e => {
+    if (window.scrollY === 0) {
+        touchendY = e.changedTouches[0].screenY;
+        if (touchendY > touchstartY + pTreshold) {
+            // refresh
+            window.location.reload();
+        }
+    }
+}, {passive: true});
+</script>
+

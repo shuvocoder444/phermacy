@@ -1,0 +1,92 @@
+{% if results %}
+<div class="p-2 space-y-1 bg-white">
+    {% for drug in results %}
+    <div 
+        tabindex="0"
+        @click="addDrugBatch('{{ drug.fefo_batch.id }}'); searchOpen = false;"
+        @keydown.enter.prevent="addDrugBatch('{{ drug.fefo_batch.id }}'); searchOpen = false;"
+        class="search-result-item flex items-center justify-between p-3 rounded-2xl cursor-pointer transition-all border border-transparent hover:border-emerald-300 hover:bg-emerald-50/50 focus:bg-emerald-50 focus:border-emerald-500 focus:outline-none group">
+        
+        <!-- Drug Details -->
+        <div class="flex items-start space-x-3">
+            <div class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 border border-emerald-200 flex items-center justify-center font-bold text-xs shrink-0">
+                {{ drug.dosage_form }}
+            </div>
+            <div>
+                <div class="flex items-center space-x-2">
+                    <span class="font-bold text-slate-900 text-base group-hover:text-emerald-700 transition-colors">
+                        {{ drug.brand_name }}
+                    </span>
+                    <span class="text-xs px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 font-mono font-bold">
+                        {{ drug.strength }}
+                    </span>
+                    {% if drug.brand_name_bn %}
+                    <span class="text-xs text-slate-500 font-normal">
+                        ({{ drug.brand_name_bn }})
+                    </span>
+                    {% endif %}
+                </div>
+                <div class="text-xs text-slate-500 mt-0.5 flex items-center space-x-2">
+                    <span class="text-emerald-700 font-semibold">{{ drug.generic_name }}</span>
+                    <span>•</span>
+                    <span>{{ drug.manufacturer }}</span>
+                    <span>•</span>
+                    <span class="text-slate-400 font-mono">র‍্যাক: {{ drug.rack_location }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- FEFO Batch & Price -->
+        <div class="text-right shrink-0">
+            <div class="text-base font-black text-emerald-700 font-mono">
+                ৳{{ drug.unit_mrp }}
+            </div>
+            
+            {% if drug.fefo_batch %}
+            <div class="flex items-center justify-end space-x-2 mt-0.5">
+                <span class="text-[11px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 font-mono font-semibold" title="Earliest Expiring Batch (FEFO)">
+                    Exp: {{ drug.fefo_batch.expiry_date }}
+                </span>
+                <span class="text-xs font-bold px-2 py-0.5 rounded {% if drug.total_stock > 10 %}bg-emerald-100 text-emerald-800{% else %}bg-rose-100 text-rose-800{% endif %}">
+                    স্টক: {{ drug.total_stock }}
+                </span>
+            </div>
+            {% else %}
+            <span class="text-xs text-rose-700 font-bold bg-rose-50 px-2 py-0.5 rounded">
+                স্টক শেষ
+            </span>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+
+    <!-- Footer Add New Drug Button -->
+    <div class="p-2 pt-1 border-t border-slate-100 flex justify-end">
+        <button 
+            type="button" 
+            @click="openAddDrugModal('{{ query|escapejs }}')" 
+            class="text-xs font-bold text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 px-3 py-1.5 rounded-xl transition-colors flex items-center gap-1.5">
+            <span>+ নতুন ঔষধ যুক্ত করুন</span>
+        </button>
+    </div>
+</div>
+{% elif query %}
+<div class="p-6 text-center text-slate-500 bg-white space-y-3">
+    <div class="w-12 h-12 rounded-full bg-slate-100 mx-auto flex items-center justify-center text-xl">
+        🔍
+    </div>
+    <div>
+        <p class="font-bold text-slate-800 text-sm">"<span class="text-emerald-600 font-black">{{ query }}</span>" ঔষধটি তালিকায় পাওয়া যায়নি</p>
+        <p class="text-xs text-slate-400 mt-0.5">আপনি চাইলে এখনই নতুন ঔষধ হিসেবে সিস্টেমে এন্ট্রি দিয়ে বিক্রি করতে পারেন।</p>
+    </div>
+    
+    <div class="pt-1">
+        <button 
+            type="button" 
+            @click="openAddDrugModal('{{ query|escapejs }}')"
+            class="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-extrabold text-xs rounded-xl shadow-md shadow-emerald-600/20 transition-all active:scale-95 inline-flex items-center gap-2">
+            <span>+ "{{ query }}" নামে সরাসরি নতুন ঔষধ যোগ করুন ⚡</span>
+        </button>
+    </div>
+</div>
+{% endif %}

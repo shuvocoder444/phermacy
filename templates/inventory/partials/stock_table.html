@@ -1,0 +1,128 @@
+<div class="overflow-x-auto">
+    <table class="w-full text-left border-collapse text-xs">
+        <thead>
+            <tr class="bg-slate-50 border-b border-slate-200 text-slate-600 font-extrabold uppercase tracking-wider text-[11px]">
+                <th class="py-3 px-4">ঔষধ ও জেনেরিক</th>
+                <th class="py-3 px-3">ব্যাচ নম্বর</th>
+                <th class="py-3 px-3">মেয়াদ (FEFO)</th>
+                <th class="py-3 px-3 text-right">ক্রয়মূল্য (TP)</th>
+                <th class="py-3 px-3 text-right">বিক্রয়মূল্য (MRP)</th>
+                <th class="py-3 px-3 text-center">মজুদ স্টক</th>
+                <th class="py-3 px-4 text-right">স্টক ভ্যালু (MRP)</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100 font-semibold text-slate-700">
+            {% for batch in page_obj %}
+            <tr class="hover:bg-slate-50/80 transition-colors">
+                <!-- Drug info -->
+                <td class="py-3 px-4">
+                    <div class="flex items-center space-x-2">
+                        <span class="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-bold">
+                            {{ batch.drug.dosage_form.short_name|default:batch.drug.dosage_form.name }}
+                        </span>
+                        <div>
+                            <span class="font-extrabold text-slate-900 text-xs sm:text-sm">{{ batch.drug.brand_name }}</span>
+                            <span class="text-[11px] text-slate-500 font-normal">({{ batch.drug.strength }})</span>
+                            <div class="text-[10px] text-slate-400">
+                                {{ batch.drug.generic.name }} • <span class="text-slate-500 font-medium">{{ batch.drug.manufacturer.name }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </td>
+
+                <!-- Batch Number -->
+                <td class="py-3 px-3">
+                    <span class="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-1 rounded-md text-[11px]">
+                        {{ batch.batch_number }}
+                    </span>
+                    {% if batch.supplier_challan_no %}
+                    <div class="text-[10px] text-slate-400 mt-0.5">চালান: {{ batch.supplier_challan_no }}</div>
+                    {% endif %}
+                </td>
+
+                <!-- Expiry Date & Badge -->
+                <td class="py-3 px-3 whitespace-nowrap">
+                    <div class="font-mono text-slate-800">{{ batch.expiry_date|date:"d M Y" }}</div>
+                    {% if batch.expiry_date <= today %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700 border border-rose-200">
+                        ❌ মেয়াদোত্তীর্ণ
+                    </span>
+                    {% elif batch.expiry_date <= expiry_60_days %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                        ⚠️ ৬০ দিনের মধ্যে শেষ
+                    </span>
+                    {% else %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                        ✓ নিরাপদ
+                    </span>
+                    {% endif %}
+                </td>
+
+                <!-- Purchase Price -->
+                <td class="py-3 px-3 text-right font-mono text-slate-600">
+                    ৳{{ batch.purchase_price }}
+                </td>
+
+                <!-- MRP -->
+                <td class="py-3 px-3 text-right font-mono font-bold text-slate-900">
+                    ৳{{ batch.unit_mrp }}
+                </td>
+
+                <!-- Stock Qty with color warning -->
+                <td class="py-3 px-3 text-center">
+                    {% if batch.current_stock == 0 %}
+                    <span class="px-2.5 py-1 rounded-xl bg-slate-100 text-slate-500 font-extrabold text-xs">
+                        স্টক শেষ (০)
+                    </span>
+                    {% elif batch.current_stock <= 15 %}
+                    <span class="px-2.5 py-1 rounded-xl bg-amber-100 text-amber-800 font-extrabold text-xs border border-amber-200">
+                        {{ batch.current_stock }} পিস
+                    </span>
+                    {% else %}
+                    <span class="px-2.5 py-1 rounded-xl bg-emerald-50 text-emerald-700 font-extrabold text-xs border border-emerald-200">
+                        {{ batch.current_stock }} পিস
+                    </span>
+                    {% endif %}
+                </td>
+
+                <!-- Stock Value -->
+                <td class="py-3 px-4 text-right font-mono font-black text-slate-800">
+                    ৳{{ batch.current_stock|floatformat:0 }}
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="7" class="py-12 text-center text-slate-400">
+                    <div class="text-3xl mb-2">🔍</div>
+                    <p class="font-bold text-slate-600">কোনো ঔষধের স্টক পাওয়া যায়নি</p>
+                    <p class="text-xs">ফিল্টার পরিবর্তন করুন অথবা 'নতুন ব্যাচ / স্টক ইন' বাটনে ক্লিক করে স্টক যুক্ত করুন।</p>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Pagination Footer -->
+{% if page_obj.has_other_pages %}
+<div class="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-600">
+    <div>
+        পৃষ্ঠা {{ page_obj.number }} / {{ page_obj.paginator.num_pages }} (মোট {{ page_obj.paginator.count }} টি আইটেম)
+    </div>
+    <div class="flex items-center space-x-1.5">
+        {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}{% if query %}&q={{ query }}{% endif %}{% if filter_type %}&filter={{ filter_type }}{% endif %}" 
+           class="px-3 py-1.5 rounded-lg bg-white border border-slate-300 font-bold hover:bg-slate-100">
+            পূর্ববর্তী
+        </a>
+        {% endif %}
+        {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}{% if query %}&q={{ query }}{% endif %}{% if filter_type %}&filter={{ filter_type }}{% endif %}" 
+           class="px-3 py-1.5 rounded-lg bg-white border border-slate-300 font-bold hover:bg-slate-100">
+            পরবর্তী
+        </a>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+

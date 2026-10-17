@@ -1,0 +1,29 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+  <title>Receipt {{ sale.invoice_number }}</title>
+  <style>
+    @page { size: 80mm auto; margin: 4mm; }
+    body { width: 72mm; margin: 0 auto; color: #111; font: 12px/1.4 monospace; }
+    header, .totals { text-align: center; } table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 3px 0; text-align: left; } .right { text-align: right; }
+    hr { border: 0; border-top: 1px dashed #333; }
+    @media screen { body { margin: 24px auto; } }
+  </style>
+</head>
+<body onload="window.print()">
+  <header><strong>{{ sale.tenant.name }}</strong><br>Medicine sales receipt</header>
+  <hr>Invoice: {{ sale.invoice_number }}<br>{{ sale.created_at|date:"d M Y, H:i" }}
+  {% if sale.customer %}<br>Customer: {{ sale.customer.name|default:sale.customer.phone }}{% endif %}
+  <hr><table><thead><tr><th>Medicine</th><th>Qty</th><th class="right">BDT</th></tr></thead>
+    <tbody>{% for line in sale.items.all %}
+      <tr><td>{{ line.medicine.name_en }}<br>{{ line.batch.batch_number }}</td>
+        <td>{{ line.quantity }}</td><td class="right">{{ line.line_total }}</td></tr>
+    {% endfor %}</tbody></table><hr>
+  <div class="totals">Subtotal ৳{{ sale.subtotal }}<br>Discount ৳{{ sale.discount_amount }}
+    <br>VAT ৳{{ sale.vat_amount }}<br><strong>Total ৳{{ sale.total }}</strong>
+    <br>Paid ৳{{ sale.amount_paid }}<br>Due ৳{{ sale.amount_due }}</div>
+  <hr><header>ধন্যবাদ · Thank you</header>
+</body>
+</html>

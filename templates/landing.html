@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+
+{% block title %}PharmaFlow BD - বাংলাদেশের এক নম্বর রিটেল ফার্মেসি ম্যানেজমেন্ট SaaS{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-white text-slate-800 flex flex-col selection:bg-emerald-500 selection:text-white overflow-y-auto">
+    
+    <!-- Top Navigation -->
+    <header class="sticky top-0 z-40 bg-white/90 backdrop-blur-xl border-b border-slate-200 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+            <!-- Brand Logo -->
+            <a href="{% url 'landing' %}" class="flex items-center space-x-3 group">
+                {% if platform_settings and platform_settings.get_logo_url %}
+                <img src="{{ platform_settings.get_logo_url }}" alt="{{ platform_settings.platform_name|default:'PharmaFlow BD' }}" class="h-10 sm:h-12 w-auto max-w-[160px] object-contain rounded-xl shadow-sm">
+                {% else %}
+                <div class="w-10 sm:w-11 h-10 sm:h-11 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-black text-xl sm:text-2xl shadow-lg shadow-emerald-500/20 group-hover:scale-105 transition-transform">
+                    +
+                </div>
+                {% endif %}
+                <div>
+                    <span class="text-lg sm:text-xl font-extrabold tracking-tight text-slate-900 flex items-center gap-1.5">
+                        {{ platform_settings.platform_name|default:"PharmaFlow" }} <span class="text-emerald-700 font-mono text-[10px] sm:text-xs px-2 py-0.5 rounded-full bg-emerald-100 border border-emerald-200">BD 🇧🇩</span>
+                    </span>
+                    <span class="text-[11px] sm:text-xs text-slate-500 block -mt-0.5 font-medium truncate max-w-[200px] sm:max-w-none">{{ platform_settings.platform_tagline|default:"ফার্মা ফ্লো • আধুনিক ফার্মেসি সফটওয়্যার" }}</span>
+                </div>
+            </a>
+
+            <!-- Nav Links -->
+            <nav class="hidden md:flex items-center space-x-8 text-sm font-bold text-slate-600">
+                <a href="#features" class="hover:text-emerald-600 transition-colors">ফিচারসমূহ</a>
+                <a href="{% url 'ledger:dashboard' %}" class="hover:text-emerald-600 transition-colors">আয়-ব্যয় লেজার</a>
+                <a href="#pricing" class="hover:text-emerald-600 transition-colors">মূল্য তালিকা</a>
+            </nav>
+
+            <!-- Actions -->
+            <div class="flex items-center space-x-2 sm:space-x-3">
+                {% if request.user.is_authenticated %}
+                    {% if request.user.is_superuser %}
+                    <a href="{% url 'saas_admin:dashboard' %}" 
+                       class="px-3 sm:px-4 py-2 sm:py-2.5 rounded-2xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs sm:text-sm border border-indigo-200 transition-all flex items-center space-x-1.5 shadow-sm">
+                        <span>👑</span>
+                        <span class="hidden sm:inline">সুপার এডমিন</span>
+                    </a>
+                    {% endif %}
+                    <a href="{% url 'tenant_dashboard:dashboard' %}" 
+                       class="px-3 sm:px-4 py-2 sm:py-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs sm:text-sm transition-all flex items-center space-x-1.5">
+                        <span>📊</span>
+                        <span>ড্যাশবোর্ড</span>
+                    </a>
+                    <a href="{% url 'pos:screen' %}" 
+                       class="px-3 sm:px-5 py-2 sm:py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs sm:text-sm shadow-lg shadow-emerald-700/20 flex items-center space-x-1.5 transition-all">
+                        <span>⚡</span>
+                        <span>POS</span>
+                    </a>
+                {% else %}
+                    <a href="{% url 'login' %}" 
+                       class="px-3 sm:px-4 py-2 sm:py-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs sm:text-sm transition-all flex items-center space-x-1.5 border border-slate-200 shadow-sm">
+                        <span>🔑</span>
+                        <span>লগইন</span>
+                    </a>
+                    <a href="{% url 'register' %}" 
+                       class="px-3 sm:px-5 py-2 sm:py-2.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs sm:text-sm shadow-lg shadow-emerald-700/20 flex items-center space-x-1.5 transition-all transform hover:-translate-y-0.5">
+                        <span>🚀</span>
+                        <span>ফ্রি ট্রায়াল</span>
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="relative pt-16 pb-24 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-emerald-50/50 via-white to-white">
+        <div class="max-w-5xl mx-auto text-center relative z-10 space-y-6">
+            
+            <div class="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold shadow-sm">
+                <span class="flex h-2 w-2 rounded-full bg-emerald-600 animate-ping"></span>
+                <span>৪০,০০০+ ঔষধ ডাটাবেস • ভয়েস ও এআই ক্যামেরা স্ক্যানার সাপোর্ট</span>
+            </div>
+
+            <h1 class="text-4xl sm:text-5xl md:text-6xl font-black tracking-tight text-slate-900 leading-tight">
+                আপনার ফার্মেসি পরিচালনা করুন <br class="hidden sm:inline">
+                <span class="bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-transparent">
+                    সুপারফাস্ট ক্লাউড POS ও অটোমেটেড স্টক ট্র্যাকিংয়ে
+                </span>
+            </h1>
+
+            <p class="text-lg text-slate-600 max-w-3xl mx-auto font-medium leading-relaxed">
+                FEFO এক্সপায়ারি এলার্ট, ভয়েস কমান্ডে ঔষধ এড, এআই ক্যামেরা স্ক্যানার, ডিজিটাল বাকি খাতা ও নগদ/বিকাশ পেমেন্ট — সবকিছু এক স্ক্রিনে।
+            </p>
+
+            <!-- CTA Buttons -->
+            <div class="pt-4 flex flex-col sm:flex-row items-center justify-center gap-4">
+                <a href="{% url 'register' %}" 
+                   class="w-full sm:w-auto px-8 py-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-base shadow-xl shadow-emerald-600/25 flex items-center justify-center space-x-2 transition-all transform hover:scale-105">
+                    <span>🚀</span>
+                    <span>১৪ দিনের ফ্রি ট্রায়ালে শুরু করুন (Start Free Trial)</span>
+                </a>
+                <a href="{% url 'pos:screen' %}" 
+                   class="w-full sm:w-auto px-8 py-4 rounded-2xl bg-white hover:bg-slate-50 text-slate-800 font-bold text-base border border-slate-300 shadow-sm transition-all flex items-center justify-center space-x-2">
+                    <span>⚡</span>
+                    <span>লাইভ POS টার্মিনাল ডেমো</span>
+                </a>
+            </div>
+
+            <!-- Highlights Badges -->
+            <div class="pt-10 grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-4xl mx-auto text-xs font-bold text-slate-700">
+                <div class="p-3 bg-white rounded-2xl border border-slate-200 shadow-sm flex items-center justify-center space-x-2">
+                    <span class="text-emerald-600">✓</span>
+                    <span>🎙️ ভয়েস কমান্ড (F3)</span>
+                </div>
+                <div class="p-3 bg-white rounded-2xl border border-slate-200 shadow-sm flex items-center justify-center space-x-2">
+                    <span class="text-cyan-600">✓</span>
+                    <span>📸 ক্যামেরা স্ক্যানার (F6)</span>
+                </div>
+                <div class="p-3 bg-white rounded-2xl border border-slate-200 shadow-sm flex items-center justify-center space-x-2">
+                    <span class="text-emerald-600">✓</span>
+                    <span>৮০ মিমি থার্মাল প্রিন্ট</span>
+                </div>
+                <div class="p-3 bg-white rounded-2xl border border-slate-200 shadow-sm flex items-center justify-center space-x-2">
+                    <span class="text-emerald-600">✓</span>
+                    <span>ডিজিটাল বাকি খাতা</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Pricing Section -->
+    <section id="pricing" class="py-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="text-center max-w-3xl mx-auto mb-16 space-y-2">
+            <h2 class="text-xs font-black tracking-widest text-emerald-700 uppercase">সাশ্রয়ী প্যাকেজ ও মূল্য</h2>
+            <p class="text-3xl sm:text-4xl font-extrabold text-slate-900">
+                আপনার ফার্মেসির জন্য উপযুক্ত প্ল্যান বেছে নিন
+            </p>
+        </div>
+
+        <div class="grid lg:grid-cols-3 gap-8">
+            <!-- Starter -->
+            <div class="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm flex flex-col justify-between space-y-6">
+                <div>
+                    <h3 class="text-xl font-bold text-slate-800">Starter (একক কাউন্টার)</h3>
+                    <p class="text-xs text-slate-500 mt-1">ছোট ও মাঝারি ফার্মেসির জন্য</p>
+                    <div class="mt-6 flex items-baseline">
+                        <span class="text-4xl font-black text-slate-900 font-mono">৳৯৯৯</span>
+                        <span class="text-slate-500 text-sm ml-2">/ প্রতি মাস</span>
+                    </div>
+                    <ul class="mt-6 space-y-3 text-xs text-slate-600 font-semibold">
+                        <li class="flex items-center"><span class="text-emerald-600 mr-2">✓</span> ১টি POS টার্মিনাল</li>
+                        <li class="flex items-center"><span class="text-emerald-600 mr-2">✓</span> ১০,০০০+ ঔষধ ডাটাবেস</li>
+                        <li class="flex items-center"><span class="text-emerald-600 mr-2">✓</span> ৮০মিমি থার্মাল প্রিন্টিং</li>
+                    </ul>
+                </div>
+                <a href="{% url 'pos:screen' %}" class="w-full py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-center text-sm transition-colors">
+                    শুরু করুন
+                </a>
+            </div>
+
+            <!-- Pro -->
+            <div class="bg-white rounded-3xl p-8 border-2 border-emerald-500 shadow-xl shadow-emerald-500/10 flex flex-col justify-between space-y-6 relative">
+                <div class="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-emerald-600 text-white font-extrabold text-xs uppercase tracking-wider shadow-md">
+                    সর্বাধিক জনপ্রিয় (Popular)
+                </div>
+                <div>
+                    <h3 class="text-xl font-bold text-slate-800">Pro (ভয়েস + ক্যামেরা + SMS)</h3>
+                    <p class="text-xs text-slate-500 mt-1">ব্যস্ত ফার্মেসির জন্য সম্পূর্ণ সমাধান</p>
+                    <div class="mt-6 flex items-baseline">
+                        <span class="text-4xl font-black text-emerald-600 font-mono">৳১,৯৯৯</span>
+                        <span class="text-slate-500 text-sm ml-2">/ প্রতি মাস</span>
+                    </div>
+                    <ul class="mt-6 space-y-3 text-xs text-slate-600 font-semibold">
+                        <li class="flex items-center"><span class="text-emerald-600 mr-2">✓</span> ৩টি মাল্টি-কাউন্টার সাপোর্ট</li>
+                        <li class="flex items-center"><span class="text-emerald-600 mr-2">✓</span> 🎙️ ভয়েস ও 📸 ক্যামেরা স্ক্যানার</li>
+                        <li class="flex items-center"><span class="text-emerald-600 mr-2">✓</span> ডিজিটাল বাকি খাতা ও ক্যাশ লেজার</li>
+                        <li class="flex items-center"><span class="text-emerald-600 mr-2">✓</span> FEFO ৩০/৬০/৯০ দিন এক্সপায়ারি এলার্ট</li>
+                    </ul>
+                </div>
+                <a href="{% url 'pos:screen' %}" class="w-full py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-center text-sm shadow-lg shadow-emerald-600/25 transition-all">
+                    ১৪ দিনের ফ্রি ট্রায়াল নিন
+                </a>
+            </div>
+
+            <!-- Enterprise -->
+            <div class="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm flex flex-col justify-between space-y-6">
+                <div>
+                    <h3 class="text-xl font-bold text-slate-800">Enterprise (চেইন ফার্মেসি)</h3>
+                    <p class="text-xs text-slate-500 mt-1">একাধিক শাখা ও সেন্ট্রাল গোডাউন</p>
+                    <div class="mt-6 flex items-baseline">
+                        <span class="text-4xl font-black text-slate-900 font-mono">৳৩,৯৯৯</span>
+                        <span class="text-slate-500 text-sm ml-2">/ প্রতি মাস</span>
+                    </div>
+                    <ul class="mt-6 space-y-3 text-xs text-slate-600 font-semibold">
+                        <li class="flex items-center"><span class="text-emerald-600 mr-2">✓</span> আনলিমিটেড শাখা ও ওয়্যারহাউস</li>
+                        <li class="flex items-center"><span class="text-emerald-600 mr-2">✓</span> কাস্টম ডোমেইন সাপোর্ট</li>
+                        <li class="flex items-center"><span class="text-emerald-600 mr-2">✓</span> ২৪/৭ ভিআইপি সাপোর্ট</li>
+                    </ul>
+                </div>
+                <a href="{% url 'pos:screen' %}" class="w-full py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-center text-sm transition-colors">
+                    যোগাযোগ করুন
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="mt-auto bg-slate-50 border-t border-slate-200 py-10 px-4 text-center text-xs text-slate-500">
+        <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="flex items-center space-x-2">
+                <span class="font-bold text-slate-800">PharmaFlow SaaS BD</span>
+                <span>•</span>
+                <span>স্বত্ব © ২০২৬ সর্বস্বত্ব সংরক্ষিত।</span>
+            </div>
+            <div class="flex items-center space-x-6 text-slate-600 font-bold">
+                <a href="{% url 'pos:screen' %}" class="hover:text-emerald-600">POS Terminal</a>
+                <a href="{% url 'ledger:dashboard' %}" class="hover:text-emerald-600">আয়-ব্যয় লেজার</a>
+                <a href="#pricing" class="hover:text-emerald-600">প্রাইসিং</a>
+            </div>
+        </div>
+    </footer>
+
+</div>
+{% endblock %}

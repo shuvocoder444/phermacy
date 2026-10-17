@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+
+{% block title %}লগইন | PharmaFlow BD - আধুনিক ফার্মেসি ম্যানেজমেন্ট SaaS{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-slate-50/60 text-slate-800 flex flex-col selection:bg-emerald-500 selection:text-white font-sans relative">
+
+    <!-- Top Navigation (Identical to Home Landing Page) -->
+    <header class="sticky top-0 z-40 bg-white/95 backdrop-blur-xl border-b border-slate-200 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+            <!-- Brand Logo -->
+            <a href="{% url 'landing' %}" class="flex items-center space-x-3 group">
+                {% if platform_settings and platform_settings.get_logo_url %}
+                <img src="{{ platform_settings.get_logo_url }}" alt="{{ platform_settings.platform_name|default:'PharmaFlow BD' }}" class="h-10 sm:h-12 w-auto max-w-[160px] object-contain rounded-xl shadow-sm">
+                {% else %}
+                <div class="w-10 sm:w-11 h-10 sm:h-11 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-black text-xl sm:text-2xl shadow-lg shadow-emerald-500/20 group-hover:scale-105 transition-transform">
+                    +
+                </div>
+                {% endif %}
+                <div>
+                    <span class="text-lg sm:text-xl font-extrabold tracking-tight text-slate-900 flex items-center gap-1.5">
+                        {{ platform_settings.platform_name|default:"PharmaFlow" }} <span class="text-emerald-700 font-mono text-[10px] sm:text-xs px-2 py-0.5 rounded-full bg-emerald-100 border border-emerald-200">BD 🇧🇩</span>
+                    </span>
+                    <span class="text-[11px] sm:text-xs text-slate-500 block -mt-0.5 font-medium truncate max-w-[200px] sm:max-w-none">{{ platform_settings.platform_tagline|default:"ফার্মা ফ্লো • আধুনিক ফার্মেসি সফটওয়্যার" }}</span>
+                </div>
+            </a>
+
+            <!-- Nav Links -->
+            <nav class="hidden md:flex items-center space-x-8 text-sm font-bold text-slate-600">
+                <a href="{% url 'landing' %}" class="hover:text-emerald-600 transition-colors">হোম</a>
+                <a href="{% url 'landing' %}#features" class="hover:text-emerald-600 transition-colors">ফিচারসমূহ</a>
+                <a href="{% url 'ledger:dashboard' %}" class="hover:text-emerald-600 transition-colors">আয়-ব্যয় লেজার</a>
+                <a href="{% url 'landing' %}#pricing" class="hover:text-emerald-600 transition-colors">মূল্য তালিকা</a>
+            </nav>
+
+            <!-- Actions -->
+            <div class="flex items-center space-x-2 sm:space-x-3">
+                {% if request.user.is_authenticated %}
+                    {% if request.user.is_superuser %}
+                    <a href="{% url 'saas_admin:dashboard' %}" 
+                       class="px-3 sm:px-4 py-2 sm:py-2.5 rounded-2xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs sm:text-sm border border-indigo-200 transition-all flex items-center space-x-1.5 shadow-sm">
+                        <span>👑</span>
+                        <span class="hidden sm:inline">সুপার এডমিন</span>
+                    </a>
+                    {% endif %}
+                    <a href="{% url 'tenant_dashboard:dashboard' %}" 
+                       class="px-3 sm:px-4 py-2 sm:py-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs sm:text-sm transition-all flex items-center space-x-1.5">
+                        <span>📊</span>
+                        <span>ড্যাশবোর্ড</span>
+                    </a>
+                    <a href="{% url 'pos:screen' %}" 
+                       class="px-3 sm:px-5 py-2 sm:py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs sm:text-sm shadow-lg shadow-emerald-700/20 flex items-center space-x-1.5 transition-all">
+                        <span>⚡</span>
+                        <span>POS</span>
+                    </a>
+                {% else %}
+                    <a href="{% url 'login' %}" 
+                       class="px-3 sm:px-4 py-2 sm:py-2.5 rounded-2xl bg-emerald-50 text-emerald-800 border border-emerald-300 font-bold text-xs sm:text-sm transition-all flex items-center space-x-1.5 shadow-sm">
+                        <span>🔑</span>
+                        <span>লগইন</span>
+                    </a>
+                    <a href="{% url 'register' %}" 
+                       class="px-3 sm:px-5 py-2 sm:py-2.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs sm:text-sm shadow-lg shadow-emerald-700/20 flex items-center space-x-1.5 transition-all transform hover:-translate-y-0.5">
+                        <span>🚀</span>
+                        <span>ফ্রি ট্রায়াল</span>
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Area with Login Form -->
+    <main class="flex-1 flex items-center justify-center px-4 py-12 sm:px-6 lg:px-8 relative z-10">
+        
+        <!-- Decorative Ambient Background Gradient -->
+        <div class="absolute inset-0 bg-gradient-to-b from-emerald-50/60 via-transparent to-transparent pointer-events-none"></div>
+
+        <div class="max-w-md w-full relative z-10 space-y-6">
+
+            <!-- Title & Subtitle -->
+            <div class="text-center space-y-2">
+                <div class="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold shadow-sm">
+                    <span class="flex h-2 w-2 rounded-full bg-emerald-600 animate-pulse"></span>
+                    <span>ফার্মেসি ম্যানেজমেন্ট ও ক্লাউড পিওএস পোর্টাল</span>
+                </div>
+                <h1 class="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                    সফটওয়্যার পোর্টালে লগইন
+                </h1>
+                <p class="text-xs text-slate-500">আপনার ইউজারনেম এবং পাসওয়ার্ড দিয়ে সুরক্ষিতভাবে প্রবেশ করুন</p>
+            </div>
+
+            <!-- Notification Messages -->
+            {% if messages %}
+            <div class="space-y-2">
+                {% for message in messages %}
+                <div class="p-3.5 rounded-2xl border text-xs font-bold flex items-center justify-between shadow-sm {% if message.tags == 'success' %}bg-emerald-50 border-emerald-300 text-emerald-800{% elif message.tags == 'warning' %}bg-amber-50 border-amber-300 text-amber-800{% else %}bg-rose-50 border-rose-300 text-rose-800{% endif %}">
+                    <span>{{ message }}</span>
+                    <span class="text-slate-400 hover:text-slate-700 cursor-pointer text-base" onclick="this.parentElement.remove()">&times;</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- Login Card -->
+            <div class="bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-8 shadow-xl shadow-slate-200/60 space-y-6" x-data="{ showPass: false }">
+                
+                <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                    <div>
+                        <h2 class="text-base font-extrabold text-slate-800">অ্যাকাউন্টে প্রবেশ করুন</h2>
+                        <p class="text-[11px] text-slate-400">সুপার এডমিন অথবা ফার্মেসি ওনার আইডি</p>
+                    </div>
+                    <span class="text-2xl">🔐</span>
+                </div>
+
+                <form method="POST" action="{% url 'login' %}" class="space-y-4 text-xs">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ next }}">
+
+                    <!-- Username Input -->
+                    <div class="space-y-1.5">
+                        <label class="block font-bold text-slate-700">ইউজারনেম / মোবাইল নম্বর <span class="text-rose-500">*</span></label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 text-sm">👤</span>
+                            <input 
+                                type="text" 
+                                name="username" 
+                                value="{{ username|default:'' }}" 
+                                required 
+                                autofocus
+                                placeholder="যেমন: admin বা আপনার মোবাইল নম্বর" 
+                                class="w-full pl-10 pr-4 py-3 rounded-2xl bg-slate-50/80 border border-slate-200 focus:border-emerald-500 focus:bg-white text-slate-900 placeholder-slate-400 font-semibold text-xs focus:outline-none focus:ring-4 focus:ring-emerald-500/10 transition-all">
+                        </div>
+                    </div>
+
+                    <!-- Password Input -->
+                    <div class="space-y-1.5">
+                        <div class="flex items-center justify-between">
+                            <label class="block font-bold text-slate-700">পাসওয়ার্ড <span class="text-rose-500">*</span></label>
+                            <button 
+                                type="button" 
+                                @click="showPass = !showPass" 
+                                class="text-[11px] font-bold text-emerald-600 hover:text-emerald-700 transition-colors">
+                                <span x-text="showPass ? 'গোপন করুন' : 'দেখান 👁️'"></span>
+                            </button>
+                        </div>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 text-sm">🔒</span>
+                            <input 
+                                :type="showPass ? 'text' : 'password'" 
+                                name="password" 
+                                required 
+                                placeholder="••••••••" 
+                                class="w-full pl-10 pr-10 py-3 rounded-2xl bg-slate-50/80 border border-slate-200 focus:border-emerald-500 focus:bg-white text-slate-900 placeholder-slate-400 font-semibold text-xs focus:outline-none focus:ring-4 focus:ring-emerald-500/10 transition-all">
+                        </div>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <button 
+                        type="submit" 
+                        class="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-sm shadow-lg shadow-emerald-700/25 transition-all active:scale-[0.98] flex items-center justify-center space-x-2">
+                        <span>লগইন করুন</span>
+                        <span class="text-base leading-none">➔</span>
+                    </button>
+                </form>
+
+                <!-- Security & Register Link Footer in Card -->
+                <div class="pt-4 border-t border-slate-100 flex flex-col items-center justify-center space-y-2.5 text-center text-xs text-slate-500">
+                    <div>
+                        আপনার ফার্মেসির অ্যাকাউন্ট নেই?
+                        <a href="{% url 'register' %}" class="text-emerald-600 font-extrabold hover:underline ml-1">১৪ দিনের ফ্রি ট্রায়াল শুরু করুন</a>
+                    </div>
+                    <div class="text-[11px] text-slate-400 flex items-center justify-center gap-1.5">
+                        <span>🛡️</span>
+                        <span>১০০% ডেটা আইসোলেশন ও এন্ড-টু-এন্ড সুরক্ষিত মাল্টি-টেন্যান্ট সিস্টেম</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Help / Hotline Note -->
+            <div class="text-center space-y-1 text-xs text-slate-500">
+                <p>নতুন ফার্মেসি সাবস্ক্রিপশন বা পাসওয়ার্ড রিসেট করতে হেল্পলাইনে কল করুন:</p>
+                <p class="font-bold text-slate-700">📞 হটলাইন: +880 1899-112233 • ✉️ support@webkoders.com</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer (Identical to Home Landing Page) -->
+    <footer class="mt-auto bg-slate-50 border-t border-slate-200 py-10 px-4 text-center text-xs text-slate-500">
+        <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="flex items-center space-x-2">
+                <span class="font-bold text-slate-800">PharmaFlow SaaS BD</span>
+                <span>•</span>
+                <span>স্বত্ব © ২০২৬ সর্বস্বত্ব সংরক্ষিত।</span>
+            </div>
+            <div class="flex items-center space-x-6 text-slate-600 font-bold">
+                <a href="{% url 'landing' %}" class="hover:text-emerald-600 transition-colors">হোম</a>
+                <a href="{% url 'landing' %}#features" class="hover:text-emerald-600 transition-colors">ফিচারসমূহ</a>
+                <a href="{% url 'ledger:dashboard' %}" class="hover:text-emerald-600 transition-colors">আয়-ব্যয় লেজার</a>
+                <a href="{% url 'landing' %}#pricing" class="hover:text-emerald-600 transition-colors">মূল্য তালিকা</a>
+                <a href="{% url 'register' %}" class="hover:text-emerald-600 transition-colors">ফ্রি ট্রায়াল</a>
+            </div>
+        </div>
+    </footer>
+
+</div>
+{% endblock %}

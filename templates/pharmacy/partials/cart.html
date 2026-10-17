@@ -1,0 +1,61 @@
+{% load pharmacy_tags %}
+<section id="cart" class="rounded-xl bg-white p-4 shadow-sm">
+  <h2 class="mb-4 text-xl font-bold">Current sale</h2>
+  {% if errors %}<div role="alert" class="mb-3 rounded bg-red-50 p-3 text-red-800">{{ errors }}</div>{% endif %}
+  <div class="space-y-2">
+    {% for medicine_id, quantity in cart.items.items %}
+      {% with item=medicine_id|medicine_info:tenant %}
+      {% if item %}
+      <div class="flex items-center justify-between border-b py-2">
+        <div><p class="font-medium">{{ item.name_en }} {{ item.strength }}</p>
+          <p class="text-sm text-slate-500">{{ quantity }} × ৳{{ item.mrp }}</p></div>
+        <form method="post" action="{% url 'cart_remove' medicine_id %}"
+          hx-post="{% url 'cart_remove' medicine_id %}" hx-target="#cart" hx-swap="outerHTML">
+          {% csrf_token %}<button class="text-red-700" aria-label="Remove item">Remove</button>
+        </form>
+      </div>
+      {% endif %}
+      {% endwith %}
+    {% empty %}
+      <p class="py-8 text-center text-slate-500">Scan or search to add medicines.</p>
+    {% endfor %}
+  </div>
+  <form method="post" action="{% url 'checkout' %}" hx-post="{% url 'checkout' %}"
+    hx-target="#cart" hx-swap="outerHTML" class="mt-5 space-y-3">
+    {% csrf_token %}
+    <div class="grid grid-cols-2 gap-2">
+      <label class="text-sm">Discount
+        <select id="discount-type" name="discount_type" class="w-full rounded border p-2">
+          <option value="none" {% if cart.discount_type == "none" %}selected{% endif %}>None</option>
+          <option value="flat" {% if cart.discount_type == "flat" %}selected{% endif %}>Flat ৳</option>
+          <option value="percent" {% if cart.discount_type == "percent" %}selected{% endif %}>Percent %</option>
+        </select>
+      </label>
+      <label class="text-sm">Discount value
+        <input id="discount-value" name="discount_value" type="number" min="0" step="0.01"
+          value="{{ cart.discount_value|default:'0' }}" class="w-full rounded border p-2">
+      </label>
+    </div>
+    <p class="text-xs text-slate-500">Discount settings are submitted at checkout.</p>
+    <label class="block text-sm">Customer phone (required for Baki)
+      <input name="customer_phone" inputmode="tel" class="w-full rounded border p-2" placeholder="01XXXXXXXXX">
+    </label>
+    <div class="grid grid-cols-2 gap-2">
+      <label class="text-sm">Paid now (BDT)
+        <input name="paid_amount" type="number" min="0" step="0.01" required class="w-full rounded border p-2">
+      </label>
+      <label class="text-sm">Payment
+        <select name="payment_method" class="w-full rounded border p-2">
+          {% for value,label in payment_methods %}<option value="{{ value }}">{{ label }}</option>{% empty %}
+          <option value="cash">Counter cash</option><option value="bkash">bKash</option>
+          <option value="nagad">Nagad</option><option value="rocket">Rocket</option>{% endfor %}
+        </select>
+      </label>
+    </div>
+    <label class="block text-sm">Gateway / payment reference (optional)
+      <input name="payment_reference" class="w-full rounded border p-2">
+    </label>
+    <button class="w-full rounded-lg bg-emerald-700 px-4 py-3 text-lg font-bold text-white"
+      {% if not cart.items %}disabled{% endif %}>Checkout · Enter</button>
+  </form>
+</section>

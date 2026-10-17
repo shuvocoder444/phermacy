@@ -1,0 +1,75 @@
+<div class="p-6 text-center" x-data x-init="
+    // Auto-trigger browser thermal print dialog
+    setTimeout(() => {
+        let printFrame = document.getElementById('thermal-print-frame');
+        if (printFrame) {
+            printFrame.contentWindow.print();
+        }
+    }, 400);
+">
+    <!-- Success Badge -->
+    <div class="w-16 h-16 mx-auto mb-3 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center">
+        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
+        </svg>
+    </div>
+
+    <h3 class="text-xl font-black text-white">Sale Completed Successfully!</h3>
+    <p class="text-sm font-mono text-emerald-400 mt-1">Invoice #{{ invoice.invoice_number }}</p>
+
+    <!-- Summary Details -->
+    <div class="my-5 p-4 bg-slate-950/60 rounded-xl border border-slate-800 text-left text-xs space-y-2">
+        <div class="flex justify-between text-slate-300">
+            <span>Customer:</span>
+            <span class="font-bold text-white">{{ invoice.customer_name_walkin }}</span>
+        </div>
+        <div class="flex justify-between text-slate-300">
+            <span>Payment Method:</span>
+            <span class="font-semibold text-emerald-400">{{ invoice.get_payment_method_display }}</span>
+        </div>
+        <div class="flex justify-between text-slate-300">
+            <span>Total Payable:</span>
+            <span class="font-bold font-mono text-white">৳{{ invoice.total_payable }}</span>
+        </div>
+        <div class="flex justify-between text-slate-300">
+            <span>Paid:</span>
+            <span class="font-bold font-mono text-emerald-400">৳{{ invoice.paid_amount }}</span>
+        </div>
+        {% if invoice.due_amount > 0 %}
+        <div class="flex justify-between text-rose-400 font-bold border-t border-slate-800 pt-1">
+            <span>New Due (Baki):</span>
+            <span class="font-mono">৳{{ invoice.due_amount }}</span>
+        </div>
+        {% endif %}
+        {% if invoice.change_returned > 0 %}
+        <div class="flex justify-between text-cyan-400 font-bold">
+            <span>Change Returned:</span>
+            <span class="font-mono">৳{{ invoice.change_returned }}</span>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Hidden iframe for automatic background thermal print -->
+    <iframe id="thermal-print-frame" src="{% url 'pos:print_receipt' invoice.id %}" class="hidden"></iframe>
+
+    <!-- Controls -->
+    <div class="flex items-center justify-center space-x-3 pt-2">
+        <a 
+            href="{% url 'pos:print_receipt' invoice.id %}" 
+            target="_blank"
+            class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs flex items-center space-x-2 transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+            </svg>
+            <span>Reprint Receipt</span>
+        </a>
+        
+        <button 
+            type="button" 
+            @click="$dispatch('close-modal'); window.location.reload();"
+            class="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-900/50 transition-all">
+            New Sale (Next Customer) [ESC / Enter]
+        </button>
+    </div>
+</div>
+

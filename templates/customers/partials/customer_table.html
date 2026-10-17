@@ -1,0 +1,70 @@
+<table class="w-full text-left text-xs">
+    <thead class="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider">
+        <tr>
+            <th class="px-5 py-3">কাস্টমার প্রোফাইল</th>
+            <th class="px-4 py-3">মোবাইল নম্বর</th>
+            <th class="px-4 py-3">ঠিকানা</th>
+            <th class="px-4 py-3 text-right">বাকি লিমিট</th>
+            <th class="px-4 py-3 text-right">বর্তমান বাকি (Due)</th>
+            <th class="px-5 py-3 text-center">একশন</th>
+        </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-100 font-medium text-slate-700">
+        {% for c in customers %}
+        <tr class="hover:bg-slate-50/80 transition-colors">
+            <td class="px-5 py-3.5">
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-full bg-slate-100 text-slate-700 font-bold flex items-center justify-center text-xs">
+                        {{ c.name|slice:":1"|upper }}
+                    </div>
+                    <div>
+                        <a href="{% url 'customers:statement' c.id %}" class="font-bold text-slate-900 hover:text-emerald-600">
+                            {{ c.name }}
+                        </a>
+                        {% if c.name_bn %}
+                        <p class="text-[11px] text-slate-400">{{ c.name_bn }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </td>
+            <td class="px-4 py-3.5 font-mono text-slate-600 font-semibold">{{ c.phone }}</td>
+            <td class="px-4 py-3.5 text-slate-500 max-w-xs truncate">{{ c.address|default:"-" }}</td>
+            <td class="px-4 py-3.5 text-right font-mono text-slate-500">৳{{ c.credit_limit|floatformat:2 }}</td>
+            <td class="px-4 py-3.5 text-right font-mono">
+                {% if c.current_due > 0 %}
+                <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                    ৳{{ c.current_due|floatformat:2 }}
+                </span>
+                {% else %}
+                <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    পরিশোধিত (৳0.00)
+                </span>
+                {% endif %}
+            </td>
+            <td class="px-5 py-3.5 text-center">
+                <div class="flex items-center justify-center gap-2">
+                    {% if c.current_due > 0 %}
+                    <button 
+                        @click="selectedCustomer = { id: '{{ c.id }}', name: '{{ c.name|escapejs }}', phone: '{{ c.phone }}', current_due: '{{ c.current_due }}' }; collectDueModal = true;"
+                        class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-[11px] shadow-sm transition-colors flex items-center gap-1"
+                    >
+                        <span>বাকি আদায়</span>
+                    </button>
+                    {% endif %}
+                    <a href="{% url 'customers:statement' c.id %}" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-bold text-[11px] transition-colors">
+                        স্টেটমেন্ট
+                    </a>
+                </div>
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="6" class="px-6 py-12 text-center text-slate-400">
+                <p class="text-sm font-semibold">কোন কাস্টমার পাওয়া যায়নি</p>
+                <p class="text-xs mt-1 text-slate-400">নতুন কাস্টমার যোগ করতে উপরের বাটনে ক্লিক করুন।</p>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+

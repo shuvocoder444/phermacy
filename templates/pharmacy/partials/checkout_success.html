@@ -1,0 +1,11 @@
+<section id="cart" class="rounded-xl bg-white p-6 shadow-sm">
+  <div class="rounded-lg bg-emerald-50 p-4 text-emerald-900">
+    <h2 class="text-xl font-bold">Sale complete · {{ sale.invoice_number }}</h2>
+    <p>Total ৳{{ sale.total }} · Paid ৳{{ sale.amount_paid }} · Due ৳{{ sale.amount_due }}</p>
+  </div>
+  <div class="mt-5 flex gap-3">
+    <a class="rounded bg-emerald-700 px-4 py-3 font-semibold text-white"
+      href="{% url 'receipt' sale.id %}" target="_blank" onclick="window.print()">Print receipt</a>
+    <a class="rounded border px-4 py-3" href="{% url 'pos' %}">New sale</a>
+  </div>
+</section>

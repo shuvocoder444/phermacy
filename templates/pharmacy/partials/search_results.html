@@ -1,0 +1,20 @@
+<div class="divide-y divide-slate-100 rounded-lg border border-slate-200">
+{% for medicine in results %}
+  <div class="flex items-center justify-between gap-3 p-3">
+    <div class="min-w-0">
+      <p class="truncate font-semibold">{{ medicine.name }}{% if medicine.strength %} {{ medicine.strength }}{% endif %}</p>
+      <p class="truncate text-sm text-slate-500">{{ medicine.generic }}{% if medicine.brand %} · {{ medicine.brand }}{% endif %} {% if medicine.name_bn %}· {{ medicine.name_bn }}{% endif %}</p>
+      <p class="text-xs text-slate-500">৳{{ medicine.mrp }} · Stock {{ medicine.stock }}</p>
+    </div>
+    <form method="post" action="{% url 'cart_add' %}" hx-post="{% url 'cart_add' %}"
+      hx-target="#cart" hx-swap="outerHTML">
+      {% csrf_token %}
+      <input type="hidden" name="medicine_id" value="{{ medicine.id }}">
+      <input type="hidden" name="quantity" value="1">
+      <button class="rounded bg-emerald-700 px-4 py-2 font-semibold text-white">Add</button>
+    </form>
+  </div>
+{% empty %}
+  <p class="p-4 text-slate-500">No matching medicine found.</p>
+{% endfor %}
+</div>

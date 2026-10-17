@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <title>Receipt #{{ invoice.invoice_number }}</title>
+    <style>
+        @page {
+            size: 80mm auto;
+            margin: 0;
+        }
+        body {
+            font-family: 'Courier New', Courier, monospace, 'Noto Sans Bengali';
+            font-size: 12px;
+            line-height: 1.25;
+            color: #000;
+            background: #fff;
+            width: 76mm;
+            margin: 0 auto;
+            padding: 8px 4px;
+        }
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .text-left { text-align: left; }
+        .font-bold { font-weight: bold; }
+        .divider {
+            border-top: 1px dashed #000;
+            margin: 5px 0;
+        }
+        .store-title {
+            font-size: 16px;
+            font-weight: 800;
+            margin-bottom: 2px;
+            text-transform: uppercase;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+        }
+        th {
+            border-bottom: 1px dashed #000;
+            padding: 3px 0;
+        }
+        td {
+            padding: 2px 0;
+            vertical-align: top;
+        }
+        @media print {
+            body { width: 100%; padding: 0; }
+            .no-print { display: none; }
+        }
+    </style>
+</head>
+<body onload="window.print()">
+
+    <!-- Store Header -->
+    <div class="text-center">
+        <div class="store-title">{{ store_name }}</div>
+        <div>{{ store_address }}</div>
+        <div>মোবাইল: {{ store_phone }}</div>
+        {% if vat_reg %}<div>BIN/VAT Reg: {{ vat_reg }}</div>{% endif %}
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Invoice Meta -->
+    <div>
+        <div><strong>ইনভয়েস নং:</strong> {{ invoice.invoice_number }}</div>
+        <div><strong>তারিখ:</strong> {{ invoice.created_at|date:"d/m/Y h:i A" }}</div>
+        <div><strong>ক্যাশিয়ার:</strong> {{ invoice.cashier.username }}</div>
+        <div><strong>গ্রাহক:</strong> {{ invoice.customer_name_walkin }} {% if invoice.customer_phone_walkin %}({{ invoice.customer_phone_walkin }}){% endif %}</div>
+        {% if invoice.doctor_name %}<div><strong>ডাক্তার:</strong> {{ invoice.doctor_name }}</div>{% endif %}
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Items Table -->
+    <table>
+        <thead>
+            <tr>
+                <th class="text-left" style="width: 48%;">আইটেম</th>
+                <th class="text-center" style="width: 16%;">পরিমাণ</th>
+                <th class="text-right" style="width: 18%;">দর</th>
+                <th class="text-right" style="width: 18%;">মোট</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+            <tr>
+                <td class="text-left">
+                    <span class="font-bold">{{ item.drug.brand_name }}</span> {{ item.drug.strength }}
+                    <br><span style="font-size: 9px; color: #333;">B:{{ item.batch.batch_number }}</span>
+                </td>
+                <td class="text-center font-bold">{{ item.quantity }}</td>
+                <td class="text-right">{{ item.unit_mrp }}</td>
+                <td class="text-right font-bold">{{ item.line_total }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="divider"></div>
+
+    <!-- Totals -->
+    <table>
+        <tr>
+            <td class="text-left">মোট মূল্য (Subtotal):</td>
+            <td class="text-right font-bold">৳{{ invoice.subtotal_mrp }}</td>
+        </tr>
+        {% if invoice.discount_amount > 0 %}
+        <tr>
+            <td class="text-left">ডিসকাউন্ট (Discount):</td>
+            <td class="text-right">-৳{{ invoice.discount_amount }}</td>
+        </tr>
+        {% endif %}
+        {% if invoice.vat_amount > 0 %}
+        <tr>
+            <td class="text-left">ভ্যাট (VAT 2.4%):</td>
+            <td class="text-right">৳{{ invoice.vat_amount }}</td>
+        </tr>
+        {% endif %}
+        <tr style="font-size: 13px;">
+            <td class="text-left font-bold">সর্বমোট প্রদেয় (Net Total):</td>
+            <td class="text-right font-bold">৳{{ invoice.total_payable }}</td>
+        </tr>
+        <tr>
+            <td class="text-left">পরিশোধ (Paid - {{ invoice.get_payment_method_display }}):</td>
+            <td class="text-right font-bold">৳{{ invoice.paid_amount }}</td>
+        </tr>
+        {% if invoice.due_amount > 0 %}
+        <tr style="font-size: 12px; font-weight: bold;">
+            <td class="text-left">বকেয়া (Due / Baki):</td>
+            <td class="text-right">৳{{ invoice.due_amount }}</td>
+        </tr>
+        {% endif %}
+        {% if invoice.change_returned > 0 %}
+        <tr>
+            <td class="text-left">ফেরত (Change):</td>
+            <td class="text-right font-bold">৳{{ invoice.change_returned }}</td>
+        </tr>
+        {% endif %}
+    </table>
+
+    <div class="divider"></div>
+
+    <!-- Footer Notes -->
+    <div class="text-center" style="font-size: 10px; margin-top: 6px;">
+        <div>সুস্থ থাকুন, ভালো থাকুন।</div>
+        <div>ক্যাশমেমো ছাড়া ওষুধ ফেরত নেওয়া হয় না।</div>
+        <div style="margin-top: 4px;">Powered by PharmaFlow SaaS BD</div>
+    </div>
+
+</body>
+</html>
+

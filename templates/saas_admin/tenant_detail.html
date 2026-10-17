@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+
+{% block title %}{{ tenant.name }} | Tenant Details | SaaS Admin{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-slate-900 text-slate-100 flex flex-col font-sans">
+    <!-- Header -->
+    <header class="bg-slate-950/80 backdrop-blur-md border-b border-slate-800 sticky top-0 z-40 px-4 sm:px-8 py-3.5 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+            <a href="{% url 'saas_admin:dashboard' %}" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs">
+                ← ফিরে যান
+            </a>
+            <div>
+                <h1 class="text-base font-extrabold text-white flex items-center space-x-2">
+                    <span>🏥 {{ tenant.name }}</span>
+                    {% if tenant.is_active %}
+                    <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30">ACTIVE</span>
+                    {% else %}
+                    <span class="text-[10px] px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-400 font-bold border border-rose-500/30">SUSPENDED</span>
+                    {% endif %}
+                </h1>
+                <p class="text-xs text-slate-400 font-mono">{{ tenant.slug }}.pos.webkoders.com</p>
+            </div>
+        </div>
+
+        <div class="flex items-center space-x-2">
+            <form method="POST" action="{% url 'saas_admin:tenant_update_status' tenant.id %}">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="toggle_active">
+                <button type="submit" class="px-3 py-1.5 rounded-xl {% if tenant.is_active %}bg-rose-600/30 hover:bg-rose-600 text-rose-300{% else %}bg-emerald-600/30 hover:bg-emerald-600 text-emerald-300{% endif %} font-bold text-xs border border-slate-700">
+                    {% if tenant.is_active %}স্থগিত করুন{% else %}সক্রিয় করুন{% endif %}
+                </button>
+            </form>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-6xl w-full mx-auto p-4 sm:p-8 space-y-6">
+        <!-- Subscription Quick Actions Card -->
+        <div class="p-6 rounded-3xl bg-slate-800/80 border border-slate-700/60 shadow-xl flex flex-col md:flex-row items-center justify-between gap-4">
+            <div>
+                <span class="text-xs uppercase tracking-wider text-slate-400 font-bold">বর্তমান সাবস্ক্রিপশন প্ল্যান</span>
+                <div class="text-2xl font-black text-white mt-1">{{ subscription.plan.name }}</div>
+                <div class="text-xs text-emerald-400 font-mono mt-1">
+                    ৳{{ subscription.plan.monthly_price_bdt }}/মাস • মেয়াদ: {{ subscription.expires_at|date:"d M Y" }}
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-2 flex-wrap gap-2">
+                <form method="POST" action="{% url 'saas_admin:tenant_update_status' tenant.id %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="extend_30_days">
+                    <button type="submit" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md">
+                        +৩০ দিন মেয়াদ বৃদ্ধি
+                    </button>
+                </form>
+                <form method="POST" action="{% url 'saas_admin:tenant_update_status' tenant.id %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="extend_365_days">
+                    <button type="submit" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md">
+                        +১ বছর মেয়াদ বৃদ্ধি
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Store Profile & Licensing -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="p-6 rounded-3xl bg-slate-800/80 border border-slate-700/60 shadow-xl space-y-3">
+                <h3 class="text-sm font-extrabold text-white flex items-center space-x-2">
+                    <span>🏢</span>
+                    <span>দোকানের বিবরণ ও যোগাযোগ</span>
+                </h3>
+                <div class="space-y-2 text-xs text-slate-300">
+                    <div class="flex justify-between py-1 border-b border-slate-750">
+                        <span class="text-slate-400">নাম (বাংলা):</span>
+                        <span class="font-bold text-white">{{ tenant.name_bn|default:"-" }}</span>
+                    </div>
+                    <div class="flex justify-between py-1 border-b border-slate-750">
+                        <span class="text-slate-400">মোবাইল নম্বর:</span>
+                        <span class="font-mono font-bold text-emerald-400">{{ tenant.phone }}</span>
+                    </div>
+                    <div class="flex justify-between py-1 border-b border-slate-750">
+                        <span class="text-slate-400">ইমেইল:</span>
+                        <span>{{ tenant.email|default:"-" }}</span>
+                    </div>
+                    <div class="flex justify-between py-1 border-b border-slate-750">
+                        <span class="text-slate-400">ঠিকানা:</span>
+                        <span>{{ tenant.address|default:"-" }}</span>
+                    </div>
+                    <div class="flex justify-between py-1">
+                        <span class="text-slate-400">নিবন্ধনের তারিখ:</span>
+                        <span class="font-mono">{{ tenant.created_on|date:"d M Y, h:i A" }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-6 rounded-3xl bg-slate-800/80 border border-slate-700/60 shadow-xl space-y-3">
+                <h3 class="text-sm font-extrabold text-white flex items-center space-x-2">
+                    <span>📜</span>
+                    <span>লাইসেন্স ও রেগুলেটরি তথ্য</span>
+                </h3>
+                <div class="space-y-2 text-xs text-slate-300">
+                    <div class="flex justify-between py-1 border-b border-slate-750">
+                        <span class="text-slate-400">DGDA ড্রাগ লাইসেন্স:</span>
+                        <span class="font-mono font-bold text-cyan-300">{{ tenant.drug_license_number|default:"দাখিল করা হয়নি" }}</span>
+                    </div>
+                    <div class="flex justify-between py-1 border-b border-slate-750">
+                        <span class="text-slate-400">ট্রেড লাইসেন্স নং:</span>
+                        <span class="font-mono">{{ tenant.trade_license_number|default:"দাখিল করা হয়নি" }}</span>
+                    </div>
+                    <div class="flex justify-between py-1 border-b border-slate-750">
+                        <span class="text-slate-400">BIN / ভ্যাট নিবন্ধন:</span>
+                        <span class="font-mono">{{ tenant.vat_reg_number|default:"দাখিল করা হয়নি" }}</span>
+                    </div>
+                    <div class="flex justify-between py-1 border-b border-slate-750">
+                        <span class="text-slate-400">ডিফল্ট ভ্যাট হার:</span>
+                        <span class="font-mono text-emerald-400 font-bold">{{ tenant.default_vat_rate }}%</span>
+                    </div>
+                    <div class="flex justify-between py-1">
+                        <span class="text-slate-400">লো-স্টক থ্রেশহোল্ড:</span>
+                        <span class="font-mono font-bold text-amber-400">{{ tenant.low_stock_threshold }} পিস</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Staff Members -->
+        <div class="p-6 rounded-3xl bg-slate-800/80 border border-slate-700/60 shadow-xl space-y-4">
+            <h3 class="text-sm font-extrabold text-white flex items-center space-x-2">
+                <span>👥</span>
+                <span>স্টাফ ও ফার্মাসিস্ট তালিকা ({{ staff_members|length }} জন)</span>
+            </h3>
+            <div class="overflow-x-auto rounded-2xl border border-slate-700/80">
+                <table class="w-full text-left text-xs text-slate-300">
+                    <thead class="bg-slate-950/80 text-slate-400 uppercase text-[10px] tracking-wider font-bold">
+                        <tr>
+                            <th class="py-2.5 px-4">ইউজারনেম ও নাম</th>
+                            <th class="py-2.5 px-4">রোল / পদবী</th>
+                            <th class="py-2.5 px-4">মোবাইল</th>
+                            <th class="py-2.5 px-4">PCB / BMDC রেজিঃ</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-800">
+                        {% for s in staff_members %}
+                        <tr>
+                            <td class="py-2.5 px-4 font-bold text-white">{{ s.user.username }} ({{ s.user.get_full_name }})</td>
+                            <td class="py-2.5 px-4"><span class="px-2 py-0.5 rounded bg-slate-700 font-bold">{{ s.get_role_display }}</span></td>
+                            <td class="py-2.5 px-4 font-mono">{{ s.phone }}</td>
+                            <td class="py-2.5 px-4 font-mono text-cyan-300">{{ s.bmdc_or_pcb_reg_no|default:"-" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="4" class="text-center py-4 text-slate-500">কোনো অতিরিক্ত স্টাফ যুক্ত করা হয়নি।</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+</div>
+{% endblock %}
+

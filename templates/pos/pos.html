@@ -1,0 +1,1562 @@
+{% extends "base.html" %}
+
+{% block title %}Point of Sale (POS) | {{ store_name }}{% endblock %}
+
+{% block content %}
+<div 
+    x-data="posTerminal()"
+    @keydown.window="handleGlobalKeydown($event)"
+    class="flex-1 flex h-full bg-slate-100 relative">
+
+    <!-- Mobile Top Navigation Header (Phone / Small Screens) -->
+    <div class="md:hidden absolute top-0 left-0 right-0 h-14 bg-white border-b border-slate-200 z-40 flex items-center justify-between px-4 shadow-sm">
+        <div class="flex items-center space-x-2.5">
+            <button @click="mobileMenuOpen = true" class="p-2 rounded-xl text-slate-600 hover:bg-slate-100 active:scale-95">
+                <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                </svg>
+            </button>
+            <div class="flex items-center space-x-2">
+                <div class="w-7 h-7 rounded-lg bg-emerald-600 text-white font-black flex items-center justify-center text-sm shadow-sm">
+                    +
+                </div>
+                <span class="font-extrabold text-sm text-slate-800">PharmaFlow POS</span>
+            </div>
+        </div>
+
+        <div class="flex items-center space-x-1.5">
+            <!-- Mobile Reload Button -->
+            <button 
+                type="button" 
+                onclick="window.location.reload(true)"
+                class="p-2 rounded-xl bg-slate-100 active:bg-slate-200 text-slate-700 text-xs font-bold shadow-sm"
+                title="রিফ্রেশ করুন">
+                🔄
+            </button>
+            <!-- Add Drug Button -->
+            <button 
+                type="button" 
+                @click="openAddDrugModal('')"
+                class="p-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold shadow-sm"
+                title="নতুন ঔষধ যুক্ত করুন">
+                ➕
+            </button>
+            <!-- Mobile Voice Button -->
+            <button 
+                type="button" 
+                @click="toggleVoice()"
+                :class="isListening ? 'bg-rose-500 text-white animate-pulse' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'"
+                class="p-2 rounded-xl text-sm font-bold shadow-sm">
+                🎙️
+            </button>
+            <!-- Mobile Camera Button -->
+            <button 
+                type="button" 
+                @click="openCameraModal()"
+                class="p-2 rounded-xl bg-cyan-50 text-cyan-700 border border-cyan-200 text-sm font-bold shadow-sm">
+                📸
+            </button>
+        </div>
+    </div>
+
+    <!-- Mobile/Tablet Drawer Overlay Backdrop -->
+    <div x-show="mobileMenuOpen || sidebarOpen" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 lg:hidden" @click="mobileMenuOpen = false; sidebarOpen = false;" x-cloak x-transition.opacity></div>
+
+    <!-- Mobile/Tablet Drawer Container -->
+    <div x-show="mobileMenuOpen || sidebarOpen" x-cloak class="fixed inset-y-0 left-0 z-50 w-72 lg:hidden">
+        {% include "partials/tenant_sidebar.html" with active_tab="pos" %}
+    </div>
+
+    <!-- Desktop Sidebar (Large screens & Laptops) -->
+    <div class="hidden lg:block shrink-0 h-screen sticky top-0">
+        {% include "partials/tenant_sidebar.html" with active_tab="pos" %}
+    </div>
+
+    <!-- Main Workspace Area -->
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden pt-14 md:pt-0">
+        
+        <!-- Top Action Bar (Desktop / Tablet) -->
+        <header class="hidden md:flex h-16 bg-white border-b border-slate-200 px-4 lg:px-6 items-center justify-between shrink-0 shadow-sm z-20">
+            
+            <!-- Quick Shortcuts Bar -->
+            <div class="flex items-center space-x-2 text-xs">
+                <!-- Tablet Menu Toggle Button (shown on screens smaller than lg) -->
+                <button 
+                    type="button" 
+                    @click="sidebarOpen = true"
+                    class="lg:hidden px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold flex items-center space-x-1.5 transition-all shadow-sm active:scale-95"
+                    title="মেনু খুলুন">
+                    <span>☰</span>
+                    <span>মেনু</span>
+                </button>
+
+                <!-- Add New Drug Button -->
+                <button 
+                    type="button" 
+                    @click="openAddDrugModal('')"
+                    class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center space-x-1.5 transition-all shadow-sm active:scale-95">
+                    <span>➕</span>
+                    <span>নতুন ঔষধ যোগ করুন</span>
+                </button>
+
+                <!-- Camera Scanner Hotkey -->
+                <button 
+                    type="button" 
+                    @click="openCameraModal()"
+                    class="px-3 py-1.5 rounded-xl bg-cyan-50 hover:bg-cyan-100 text-cyan-700 border border-cyan-200 font-mono font-bold flex items-center space-x-1.5 transition-all shadow-sm active:scale-95">
+                    <span>📸</span>
+                    <span><kbd class="bg-cyan-200/80 px-1 rounded text-cyan-900">F6</kbd> ক্যামেরা স্ক্যান</span>
+                </button>
+
+                <!-- Voice Hotkey Badge -->
+                <button 
+                    type="button" 
+                    @click="toggleVoice()"
+                    :class="isListening ? 'bg-rose-500 text-white animate-pulse border-rose-400 shadow-md' : 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'"
+                    class="px-3 py-1.5 rounded-xl border font-mono font-bold flex items-center space-x-1.5 transition-all shadow-sm active:scale-95">
+                    <span>🎙️</span>
+                    <span><kbd :class="isListening ? 'bg-rose-700 text-white' : 'bg-emerald-200/80 text-emerald-900'" class="px-1 rounded">F3</kbd> ভয়েস কমান্ড</span>
+                    <span x-show="isListening" class="w-2 h-2 rounded-full bg-white animate-ping"></span>
+                </button>
+
+                <!-- AI Multimodal Settings (Gemini) -->
+                <button 
+                    type="button" 
+                    @click="openAiConfigModal()"
+                    class="px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 font-bold flex items-center space-x-1.5 transition-all shadow-sm active:scale-95"
+                    title="Google Gemini AI ও মাল্টিমোডাল ইঞ্জিন সেটিংস">
+                    <span>🤖</span>
+                    <span>AI সেটিংস</span>
+                    <span x-show="isAiActive" class="w-2 h-2 rounded-full bg-emerald-500 shadow-sm" title="Gemini AI সক্রিয়"></span>
+                </button>
+
+                <!-- Train AI Hotkey -->
+                <button 
+                    type="button" 
+                    @click="openTrainModal('')"
+                    class="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold flex items-center space-x-1.5 transition-all shadow-sm active:scale-95">
+                    <span>🎓</span>
+                    <span><kbd class="bg-indigo-200/80 px-1 rounded text-indigo-900">F7</kbd> ঔষধ শেখান</span>
+                </button>
+
+                <!-- Recent Invoices Button -->
+                <button 
+                    type="button" 
+                    hx-get="{% url 'pos:recent_invoices' %}"
+                    hx-target="#recent-invoices-modal-content"
+                    onclick="document.getElementById('recent-invoices-modal').classList.remove('hidden')"
+                    class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-bold flex items-center space-x-1.5 transition-all shadow-sm active:scale-95"
+                    title="আজকের তৈরি ইনভয়েসসমূহ দেখুন বা পুনরায় প্রিন্ট করুন">
+                    <span>📜</span>
+                    <span>সাম্প্রতিক রসিদ</span>
+                </button>
+
+                <span class="hidden xl:inline-flex px-2 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-600 font-mono">
+                    <kbd class="text-emerald-600 font-bold">F2</kbd> Search
+                </span>
+                <span class="hidden xl:inline-flex px-2 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-600 font-mono">
+                    <kbd class="text-emerald-600 font-bold">F4</kbd> Discount
+                </span>
+                <span class="hidden xl:inline-flex px-2 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-600 font-mono">
+                    <kbd class="text-emerald-600 font-bold">Enter</kbd> Tender
+                </span>
+            </div>
+
+            <!-- Pharmacist & Live Clock -->
+            <div class="flex items-center space-x-4">
+                <div class="text-right">
+                    <div class="text-xs font-bold text-slate-800">{{ request.user.get_full_name|default:"ফার্মাসিস্ট (Pharmacist)" }}</div>
+                    <div class="text-[11px] text-emerald-600 font-mono font-bold" x-text="currentTime"></div>
+                </div>
+                <div class="w-9 h-9 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 font-bold text-xs">
+                    👨‍⚕️
+                </div>
+            </div>
+        </header>
+
+        <!-- Voice Listening Live Overlay Banner -->
+        <div 
+            x-show="isListening" 
+            x-cloak 
+            x-transition
+            class="bg-rose-50 border-b-2 border-rose-500 px-4 sm:px-6 py-2.5 flex items-center justify-between text-rose-900 z-40 shrink-0 shadow-sm">
+            <div class="flex items-center space-x-2 sm:space-x-3 overflow-hidden">
+                <div class="flex space-x-1 items-end h-5 shrink-0">
+                    <div class="w-1.5 bg-rose-500 rounded-full animate-bounce h-3"></div>
+                    <div class="w-1.5 bg-rose-500 rounded-full animate-bounce h-5" style="animation-delay: 0.15s;"></div>
+                    <div class="w-1.5 bg-rose-500 rounded-full animate-bounce h-4" style="animation-delay: 0.3s;"></div>
+                </div>
+                <div class="truncate">
+                    <span class="font-bold text-xs sm:text-sm text-rose-700">🎙️ শুনছি: </span>
+                    <span class="text-xs text-rose-800 font-medium" x-text="speechTranscript || 'মুখে বলুন: নাপা ১০টা, সারজেল ২০ বিশটা, কাফ সিরাপ ২টা...'"></span>
+                </div>
+            </div>
+            <button 
+                type="button" 
+                @click="stopVoice()"
+                class="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs transition-colors shrink-0 shadow-sm">
+                থামান
+            </button>
+        </div>
+
+        <!-- POS Main Responsive Layout (Phone, Tablet, Desktop) -->
+        <div class="flex-1 flex flex-col md:grid md:grid-cols-12 gap-0 overflow-hidden relative">
+            
+            <!-- Left Area: Search Bar & Cart Table -->
+            <section class="flex-1 md:col-span-7 lg:col-span-8 flex flex-col border-r border-slate-200 bg-white overflow-hidden pb-16 md:pb-0">
+                
+                <!-- Instant Search Input (F2) -->
+                <div class="p-3 sm:p-4 bg-slate-50/70 border-b border-slate-200 relative z-30 flex items-center space-x-2">
+                    <div class="relative flex-1">
+                        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                            <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                        </div>
+                        
+                        <input 
+                            type="text" 
+                            id="drug-search-input"
+                            x-ref="searchInput"
+                            name="q"
+                            placeholder="ঔষধ খুঁজুন (যেমন: Napa, Sergel, Monas, সিরাপ, ড্রপ)..."
+                            hx-get="{% url 'pos:search' %}"
+                            hx-trigger="focus, keyup changed delay:120ms, search"
+                            hx-target="#search-results-dropdown"
+                            @focus="searchOpen = true"
+                            @input="searchOpen = true"
+                            @keydown.escape="searchOpen = false"
+                            class="w-full bg-white border-2 border-slate-200 focus:border-emerald-500 rounded-2xl pl-10 sm:pl-11 pr-12 sm:pr-20 py-2.5 sm:py-3 text-slate-800 placeholder-slate-400 text-xs sm:text-sm font-semibold transition-all shadow-sm focus:outline-none">
+
+                        <div class="absolute inset-y-0 right-0 pr-3 hidden sm:flex items-center space-x-1.5 pointer-events-none">
+                            <span class="px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-xs font-mono text-emerald-700 font-bold">F2</span>
+                        </div>
+                    </div>
+
+                    <!-- Search Results Dropdown -->
+                    <div 
+                        id="search-results-dropdown" 
+                        x-show="searchOpen" 
+                        @click.outside="searchOpen = false"
+                        x-cloak
+                        class="absolute left-2 right-2 sm:left-4 sm:right-4 top-full mt-1.5 bg-white border border-slate-200 rounded-3xl shadow-2xl max-h-80 sm:max-h-96 overflow-y-auto z-50">
+                        <!-- HTMX injects search results here -->
+                    </div>
+                </div>
+
+                <!-- Clean White Cart Table Component -->
+                {% include "pos/partials/cart_table.html" %}
+
+                <!-- Desktop Bottom Action Strip -->
+                <div class="hidden sm:flex p-3 bg-slate-50 border-t border-slate-200 items-center justify-between shrink-0">
+                    <div class="flex items-center space-x-2">
+                        <button 
+                            type="button" 
+                            hx-post="{% url 'pos:cart_clear' %}" 
+                            hx-target="#cart-container"
+                            hx-swap="outerHTML"
+                            hx-confirm="আপনি কি সম্পূর্ণ কার্টটি মুছে ফেলতে চান?"
+                            class="px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold transition-colors">
+                            <span>কার্ট খালি করুন [F8]</span>
+                        </button>
+                        <button 
+                            type="button" 
+                            hx-post="{% url 'pos:hold_cart' %}" 
+                            hx-target="#cart-container"
+                            hx-swap="outerHTML"
+                            class="px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-bold transition-colors"
+                            title="বর্তমান কার্টটি স্থগিত রাখুন ও পরবর্তী কাস্টমারের বিল করুন">
+                            <span>⏸️ হোল্ড কার্ট</span>
+                        </button>
+                        <button 
+                            type="button" 
+                            hx-get="{% url 'pos:held_carts' %}" 
+                            hx-target="#held-carts-modal-content"
+                            onclick="document.getElementById('held-carts-modal').classList.remove('hidden')"
+                            class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-xs font-bold transition-colors"
+                            title="স্থগিত রাখা কার্টগুলো দেখুন ও রিস্টোর করুন">
+                            <span>📂 সংরক্ষিত কার্ট</span>
+                        </button>
+                        <span class="text-xs text-slate-300">|</span>
+                        <span class="text-xs text-slate-600 font-medium">মোট আইটেম: <strong class="text-emerald-600 font-bold" id="total-items-badge">{{ cart.total_items_count|default:0 }}</strong>টি</span>
+                    </div>
+                    
+                    <div class="flex items-center space-x-2">
+                        <button 
+                            type="button" 
+                            @click="openAddDrugModal('')"
+                            class="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold transition-colors">
+                            ➕ নতুন ঔষধ যোগ
+                        </button>
+                        <button 
+                            type="button" 
+                            @click="openTrainModal('')"
+                            class="px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 text-xs font-bold transition-colors">
+                            🎓 ঔষধ শেখান (Train AI)
+                        </button>
+                        <button 
+                            type="button"
+                            @click="openCameraModal()"
+                            class="px-3 py-1.5 rounded-xl bg-cyan-50 hover:bg-cyan-100 text-cyan-700 border border-cyan-200 text-xs font-bold transition-colors">
+                            📸 ক্যামেরা স্ক্যান [F6]
+                        </button>
+                        <button 
+                            type="button"
+                            @click="toggleVoice()"
+                            class="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold transition-colors">
+                            🎙️ ভয়েস এড [F3]
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Right Area / Mobile Tender Drawer (Phone, Tablet, Desktop) -->
+            <aside 
+                :class="mobileDrawerOpen ? 'translate-y-0' : 'translate-y-full md:translate-y-0'"
+                class="fixed md:static inset-x-0 bottom-0 top-14 md:top-0 md:col-span-5 lg:col-span-4 flex flex-col bg-slate-50 md:bg-slate-50/80 p-3 sm:p-4 lg:p-5 space-y-3 sm:space-y-4 justify-between overflow-y-auto z-40 md:z-auto transition-transform duration-300 ease-in-out border-t md:border-t-0 shadow-2xl md:shadow-none pb-safe">
+                
+                <div class="space-y-3 sm:space-y-4">
+                    <!-- Mobile Drawer Header (shown on mobile phones only) -->
+                    <div class="flex items-center justify-between md:hidden pb-2 border-b border-slate-200">
+                        <h3 class="font-extrabold text-sm text-slate-800">বিলিং ও পেমেন্ট (Checkout)</h3>
+                        <button @click="mobileDrawerOpen = false" class="p-1 text-slate-400 hover:text-slate-700 text-lg font-bold">&times; বন্ধ করুন</button>
+                    </div>
+
+                    <!-- Customer & Baki Card -->
+                    <div class="bg-white p-3.5 sm:p-4 rounded-3xl border border-slate-200 shadow-sm space-y-2.5">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold uppercase tracking-wider text-slate-500">গ্রাহক ও বাকি খাতা</span>
+                            <a href="{% url 'customers:dashboard' %}" class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold hover:bg-emerald-100">
+                                বাকি খাতা ↗
+                            </a>
+                        </div>
+                        <div class="space-y-2">
+                            <input 
+                                type="text" 
+                                id="customer-phone-input"
+                                placeholder="মোবাইল নং (যেমন: 01711223344)"
+                                value="{{ cart.customer_phone }}"
+                                class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 font-mono placeholder-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none">
+                            <input 
+                                type="text" 
+                                id="customer-name-input"
+                                placeholder="কাস্টমারের নাম (Walk-in Customer)"
+                                value="{{ cart.customer_name }}"
+                                class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 placeholder-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none">
+                        </div>
+                    </div>
+
+                    <!-- Discount Options (F4) -->
+                    <!-- Discount Options (F4) -->
+                    <div id="pos-discount-card" class="bg-white p-3.5 sm:p-4 rounded-3xl border border-slate-200 shadow-sm">
+                        <div class="flex items-center justify-between mb-2">
+                            <label class="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center space-x-1.5">
+                                <span>ডিসকাউন্ট (Discount)</span>
+                                <kbd class="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 text-[10px] text-emerald-700 font-mono">F4</kbd>
+                            </label>
+                        </div>
+                        <form 
+                            id="pos-discount-form"
+                            hx-post="{% url 'pos:cart_discount' %}" 
+                            hx-target="#cart-container"
+                            hx-swap="outerHTML"
+                            class="grid grid-cols-2 gap-2">
+                            <div>
+                                <span class="text-[11px] text-slate-500 mb-1 block">শতাংশ (%)</span>
+                                <input 
+                                    type="number" 
+                                    id="discount-percent-input"
+                                    x-ref="discountInput"
+                                    name="discount_percent" 
+                                    value="{{ cart.discount_percent|default:'0.00' }}"
+                                    min="0" 
+                                    max="100" 
+                                    step="0.5"
+                                    @input.debounce.350ms="htmx.trigger('#pos-discount-form', 'submit')"
+                                    class="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-mono font-bold text-slate-800 focus:border-emerald-500 focus:bg-white focus:outline-none text-right">
+                            </div>
+                            <div>
+                                <span class="text-[11px] text-slate-500 mb-1 block">নির্দিষ্ট টাকা (৳)</span>
+                                <input 
+                                    type="number" 
+                                    id="discount-flat-input"
+                                    name="discount_flat" 
+                                    value="{{ cart.discount_flat|default:'0.00' }}"
+                                    min="0" 
+                                    step="1"
+                                    @input.debounce.350ms="htmx.trigger('#pos-discount-form', 'submit')"
+                                    class="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-mono font-bold text-slate-800 focus:border-emerald-500 focus:bg-white focus:outline-none text-right">
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Real-Time Bill Breakdown Card -->
+                    <div id="pos-bill-summary-card" class="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200 shadow-sm space-y-3">
+                        <div class="flex items-center justify-between text-xs text-slate-500 font-medium">
+                            <span>সাব-টোটাল (Sub Total)</span>
+                            <span class="font-mono text-slate-700 font-bold" id="cart-subtotal">৳{{ cart.subtotal|default:cart.subtotal_mrp|default:'0.00' }}</span>
+                        </div>
+                        
+                        <div class="flex items-center justify-between text-xs text-slate-500 font-medium">
+                            <span>ছাড় (Discount)</span>
+                            <span class="font-mono text-rose-600 font-bold" id="cart-discount">-৳{{ cart.total_discount|default:cart.discount_amount|default:'0.00' }}</span>
+                        </div>
+
+                        <div class="flex items-center justify-between text-xs text-slate-500 font-medium">
+                            <span>ভ্যাট (VAT {% if cart.vat_percent and cart.vat_percent != '0.00' %}{{ cart.vat_percent }}%{% else %}0%{% endif %})</span>
+                            <span class="font-mono text-slate-700 font-bold" id="cart-vat">৳{{ cart.vat_amount|default:'0.00' }}</span>
+                        </div>
+
+                        <div class="pt-3 border-t-2 border-dashed border-slate-200 flex items-center justify-between">
+                            <span class="text-sm font-extrabold text-slate-900">সর্বমোট (Net Total)</span>
+                            <span class="text-2xl font-black text-emerald-600 font-mono tracking-tight" id="cart-grand-total">৳{{ cart.grand_total|default:cart.total_payable|default:'0.00' }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Instant Tender / Checkout Trigger Button -->
+                <div class="space-y-2 pt-2">
+                    <button 
+                        type="button" 
+                        @click="openCheckoutModal()"
+                        class="w-full py-4 px-6 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-extrabold rounded-2xl shadow-lg shadow-emerald-600/30 flex items-center justify-between transition-all transform active:scale-95 text-base">
+                        <div class="flex items-center space-x-2">
+                            <span>⚡</span>
+                            <span>চেকআউট ও পেমেন্ট</span>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <span class="font-mono font-black text-lg" id="cart-btn-grand-total">৳{{ cart.grand_total|default:cart.total_payable|default:'0.00' }}</span>
+                            <span class="text-xs bg-emerald-700/60 px-2 py-0.5 rounded-lg font-mono">⏎ Enter</span>
+                        </div>
+                    </button>
+                </div>
+            </aside>
+
+            <!-- Sticky Mobile Bottom Bar (Phone / Small screens) -->
+            <div class="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-3 px-4 flex items-center justify-between z-30 shadow-2xl pb-safe">
+                <div>
+                    <span class="text-[10px] text-slate-400 font-bold uppercase block">সর্বমোট (<span id="cart-mobile-items-count">{{ cart.total_items_count|default:0 }}</span> আইটেম)</span>
+                    <span class="text-lg font-black text-emerald-600 font-mono" id="cart-mobile-grand-total">৳{{ cart.grand_total|default:cart.total_payable|default:'0.00' }}</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <button 
+                        type="button" 
+                        @click="mobileDrawerOpen = !mobileDrawerOpen"
+                        class="px-3 py-2.5 bg-slate-100 active:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs flex items-center gap-1">
+                        <span>বাকি/ডিসকাউন্ট</span>
+                    </button>
+                    <button 
+                        type="button" 
+                        @click="openCheckoutModal()"
+                        class="px-5 py-2.5 bg-emerald-600 active:bg-emerald-700 text-white font-extrabold rounded-xl text-xs shadow-md shadow-emerald-600/20 flex items-center gap-1.5">
+                        <span>চেকআউট ⚡</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Add New Custom Medicine (Live Form) -->
+    <div 
+        id="add-drug-modal"
+        x-show="addDrugModalOpen" 
+        x-cloak
+        class="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+        
+        <div 
+            @click.outside="addDrugModalOpen = false"
+            class="bg-white rounded-t-3xl sm:rounded-3xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden max-h-[90vh] flex flex-col pb-safe">
+            
+            <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                <div class="flex items-center space-x-2.5">
+                    <span class="text-xl">💊</span>
+                    <div>
+                        <h3 class="font-extrabold text-slate-800 text-sm">নতুন ঔষধ যুক্ত করুন (Add Medicine)</h3>
+                        <p class="text-[11px] text-slate-500">নাম টাইপ করে সরাসরি সিস্টেমে এন্ট্রি দিন ও কার্টে যোগ করুন</p>
+                    </div>
+                </div>
+                <button 
+                    type="button" 
+                    @click="addDrugModalOpen = false" 
+                    class="w-8 h-8 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-700 font-black flex items-center justify-center">
+                    ✕
+                </button>
+            </div>
+
+            <!-- Add Drug Form -->
+            <form 
+                hx-post="{% url 'pos:add_custom_drug' %}" 
+                hx-target="#cart-container" 
+                hx-swap="outerHTML"
+                @htmx:after-request="addDrugModalOpen = false; searchOpen = false;"
+                class="p-5 overflow-y-auto space-y-3.5">
+                {% csrf_token %}
+                
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">ঔষধের ব্র্যান্ড নাম * (যেমন: Napa, Maxpro 20, Tusca Syrup)</label>
+                    <input 
+                        type="text" 
+                        name="brand_name" 
+                        x-model="newDrugName"
+                        required 
+                        placeholder="ঔষধের নাম লিখুন" 
+                        class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs sm:text-sm font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">ডোজের ধরন (Dosage Form) *</label>
+                        <select name="dosage_form" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                            <option value="Tablet">ট্যাবলেট (Tablet)</option>
+                            <option value="Syrup">সিরাপ (Syrup)</option>
+                            <option value="Capsule">ক্যাপসুল (Capsule)</option>
+                            <option value="Suspension">সাসপেনশন (Suspension)</option>
+                            <option value="Injection">ইনজেকশন (Injection)</option>
+                            <option value="Eye Drops">আই ড্রপ (Eye Drops)</option>
+                            <option value="Ear Drops">কানের ড্রপ (Ear Drops)</option>
+                            <option value="Cream">ক্রিম (Cream)</option>
+                            <option value="Ointment">মলম (Ointment)</option>
+                            <option value="Nasal Spray">ন্যাজাল স্প্রে (Nasal Spray)</option>
+                            <option value="Inhaler">ইনহেলার (Inhaler)</option>
+                            <option value="Oral Saline / Powder">স্যালাইন / পাউডার</option>
+                            <option value="Suppository">সাপোজিটরি (Suppository)</option>
+                            <option value="IV Infusion">আইভি স্যালাইন (IV Infusion)</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">পাওয়ার / সাইজ (Strength)</label>
+                        <input type="text" name="strength" placeholder="যেমন: 500 mg, 100 ml, 20 mg" value="500 mg" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">জেনেরিক নাম (Generic)</label>
+                        <input type="text" name="generic_name" placeholder="যেমন: Paracetamol, Esomeprazole" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">কোম্পানির নাম (Manufacturer)</label>
+                        <input type="text" name="manufacturer" placeholder="যেমন: Square, Incepta, Beximco" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-3 bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-700 mb-1">বিক্রয় মূল্য MRP (৳) *</label>
+                        <input type="number" step="0.01" name="unit_mrp" value="10.00" required class="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-mono font-bold text-emerald-700 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-right">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-700 mb-1">ক্রয় মূল্য TP (৳)</label>
+                        <input type="number" step="0.01" name="purchase_price" value="8.20" class="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-mono font-bold text-slate-700 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-right">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-700 mb-1">প্রারম্ভিক স্টক (পিস)</label>
+                        <input type="number" name="initial_stock" value="100" class="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-mono font-bold text-slate-700 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-right">
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                    <button type="button" @click="addDrugModalOpen = false" class="px-4 py-2.5 bg-slate-100 text-slate-700 font-bold rounded-xl text-xs hover:bg-slate-200">বাতিল</button>
+                    <button type="submit" class="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-extrabold rounded-xl text-xs shadow-md shadow-emerald-600/25 active:scale-95 flex items-center gap-1.5">
+                        <span>সংরক্ষণ ও কার্টে যোগ করুন ⚡</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Live Camera Scanner & OCR Prescription Modal -->
+    <div 
+        id="camera-scanner-modal"
+        x-show="cameraModalOpen" 
+        x-cloak
+        class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-4">
+        
+        <div 
+            @click.outside="closeCameraModal()"
+            class="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-xl w-full overflow-hidden flex flex-col max-h-[94vh] sm:max-h-[90vh]">
+            
+            <div class="px-4 py-3 sm:py-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50 shrink-0">
+                <div class="flex items-center space-x-2">
+                    <span class="text-xl">📸</span>
+                    <div>
+                        <h3 class="font-black text-slate-800 text-xs sm:text-sm">প্রেসক্রিপশন ও মেডিসিন স্ক্যানার</h3>
+                        <p class="text-[10px] sm:text-[11px] text-slate-500">ঔষধের নাম বা প্রেসক্রিপশন ক্যামেরার সামনে ধরুন</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <button 
+                        type="button" 
+                        @click="toggleFlashlight()" 
+                        class="px-2.5 py-1.5 rounded-full bg-slate-200 hover:bg-emerald-100 text-slate-700 hover:text-emerald-700 font-bold text-[10px] sm:text-xs flex items-center space-x-1 transition-colors"
+                        :class="{ 'bg-emerald-100 text-emerald-700 ring-2 ring-emerald-500': torchOn }">
+                        <span>💡</span>
+                        <span class="hidden sm:inline">ফ্লাশ</span>
+                    </button>
+                    <button 
+                        type="button" 
+                        @click="closeCameraModal()" 
+                        class="w-8 h-8 rounded-full bg-slate-200 hover:bg-rose-100 hover:text-rose-600 text-slate-700 font-black flex items-center justify-center transition-colors">
+                        ✕
+                    </button>
+                </div>
+            </div>
+
+            <!-- Viewfinder Area (Adaptive: shrink to compact preview when scan results appear) -->
+            <div 
+                id="camera-viewfinder-container"
+                :class="hasScanResults ? 'h-28 sm:h-44' : 'h-52 sm:h-72'"
+                class="relative bg-slate-900 transition-all duration-300 flex flex-col items-center justify-center overflow-hidden shrink-0">
+                <video 
+                    id="camera-video-feed" 
+                    autoplay 
+                    playsinline 
+                    muted
+                    class="w-full h-full object-cover"></video>
+                <canvas id="camera-capture-canvas" class="hidden"></canvas>
+                
+                <!-- Target Reticle Box -->
+                <div id="camera-reticle-box" class="absolute inset-4 sm:inset-8 border-2 border-dashed border-emerald-400 rounded-2xl sm:rounded-3xl pointer-events-none flex items-center justify-center">
+                    <span class="text-[10px] sm:text-xs text-white/90 bg-slate-900/70 px-2.5 py-1 rounded-full backdrop-blur-sm shadow">মেডিসিনের নাম মাঝখানে রাখুন</span>
+                </div>
+
+                <!-- Camera Initializing Spinner -->
+                <div 
+                    id="camera-loading-indicator"
+                    class="absolute inset-0 bg-slate-900/90 flex flex-col items-center justify-center space-y-2 pointer-events-none transition-opacity">
+                    <div class="w-8 h-8 border-3 border-emerald-400 border-t-transparent rounded-full animate-spin"></div>
+                    <span class="text-xs text-slate-300 font-medium">ক্যামেরা চালু হচ্ছে...</span>
+                </div>
+
+                <!-- Processing Spinner -->
+                <div 
+                    x-show="ocrScanning" 
+                    x-cloak
+                    class="absolute inset-0 bg-slate-900/85 backdrop-blur-sm flex flex-col items-center justify-center space-y-3 z-10">
+                    <div class="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+                    <p class="text-xs font-bold text-white font-mono animate-pulse">OCR টেক্সট রিড করা হচ্ছে...</p>
+                </div>
+
+                <!-- Toggle view button when results exist -->
+                <template x-if="hasScanResults">
+                    <button 
+                        type="button" 
+                        @click="hasScanResults = false"
+                        class="absolute bottom-2 right-2 px-2.5 py-1 rounded-lg bg-black/60 hover:bg-black/80 text-white text-[10px] font-bold backdrop-blur-sm flex items-center space-x-1 transition-all z-10">
+                        <span>🔍 ক্যামেরা বড় করুন</span>
+                    </button>
+                </template>
+            </div>
+
+            <!-- Modal OCR Results Area (Expands naturally with smooth scroll) -->
+            <div 
+                id="camera-scan-results-box" 
+                class="flex-1 min-h-[160px] max-h-[55vh] sm:max-h-[380px] overflow-y-auto p-2.5 sm:p-4 bg-slate-50 border-t border-slate-200">
+                <div class="p-6 text-center text-slate-400 space-y-1">
+                    <span class="text-3xl block mb-1">📸</span>
+                    <p class="text-xs font-bold text-slate-600">ঔষধের নাম সোজাভাবে ফ্রেমে রাখুন</p>
+                    <p class="text-[11px] text-slate-400">নিচের "⚡ স্ক্যান ও ম্যাচ করুন" বাটনে চাপুন</p>
+                </div>
+            </div>
+
+            <!-- Modal Footer Controls -->
+            <div class="p-3 sm:p-4 bg-white border-t border-slate-100 flex items-center justify-between gap-2 pb-safe shrink-0">
+                <button 
+                    type="button" 
+                    @click="closeCameraModal()"
+                    class="px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs shrink-0">
+                    বাতিল
+                </button>
+                <div class="flex items-center space-x-2 shrink-0">
+                    <!-- Hidden File Input for Direct Gallery / Photo Upload -->
+                    <input 
+                        type="file" 
+                        id="camera-file-input" 
+                        accept="image/*" 
+                        class="hidden" 
+                        @change="handleFileUpload($event)">
+                    <button 
+                        type="button" 
+                        @click="document.getElementById('camera-file-input').click()"
+                        :disabled="ocrScanning"
+                        class="px-2.5 sm:px-3.5 py-2 sm:py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center space-x-1 transition-colors">
+                        <span>📁</span>
+                        <span class="hidden sm:inline">ছবি আপলোড</span>
+                    </button>
+                    <button 
+                        type="button" 
+                        @click="captureAndScan()"
+                        :disabled="ocrScanning"
+                        class="px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-extrabold text-xs shadow-md shadow-emerald-600/30 flex items-center space-x-1.5 transition-all">
+                        <span>⚡</span>
+                        <span>স্ক্যান ও ম্যাচ করুন</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Medicine Training Modal -->
+    <div 
+        id="train-medicine-modal"
+        x-show="trainModalOpen" 
+        x-cloak
+        class="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+        
+        <div 
+            @click.outside="trainModalOpen = false"
+            class="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-md w-full overflow-hidden flex flex-col">
+            
+            <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-purple-50">
+                <div class="flex items-center space-x-2">
+                    <span class="text-xl">🎓</span>
+                    <div>
+                        <h3 class="font-extrabold text-purple-900 text-sm">AI ঔষধ ট্রেইনিং (শেখানো)</h3>
+                        <p class="text-[11px] text-purple-700">যেকোনো ভয়েস উচ্চারণ বা স্ক্যান টেক্সট সরাসরি আসল ওষুধের সাথে লিংক করুন</p>
+                    </div>
+                </div>
+                <button 
+                    type="button" 
+                    @click="trainModalOpen = false" 
+                    class="w-7 h-7 rounded-full bg-purple-200/60 hover:bg-rose-100 hover:text-rose-600 text-purple-900 font-black flex items-center justify-center transition-colors text-xs">
+                    ✕
+                </button>
+            </div>
+
+            <form @submit.prevent="submitMedicineTraining()" class="p-5 space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">
+                        উচ্চারণ / কথ্য নাম বা স্ক্যান টেক্সট *
+                    </label>
+                    <input 
+                        type="text" 
+                        x-model="trainAlias" 
+                        required 
+                        placeholder="যেমন: নাপা লাল, টাইপ্লাস, এন্টাসিড সিরাপ" 
+                        class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-purple-500 focus:outline-none">
+                    <p class="text-[10px] text-slate-400 mt-1">কাস্টমার মুখে যা বলে বা ক্যামেরায় যেভাবে আসে তা লিখুন।</p>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">
+                        আসল ঔষধের নাম (Database Brand Name) *
+                    </label>
+                    <input 
+                        type="text" 
+                        x-model="trainBrand" 
+                        required 
+                        placeholder="যেমন: Napa Extra, Ty-plus, Entacyd Plus" 
+                        class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-emerald-800 focus:ring-2 focus:ring-purple-500 focus:outline-none">
+                    <p class="text-[10px] text-slate-400 mt-1">ডাটাবেজে থাকা ওষুধের ব্র্যান্ডের সঠিক নাম দিন।</p>
+                </div>
+
+                <div x-show="trainSuccessMsg" x-cloak class="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs font-bold flex items-center space-x-1">
+                    <span>✓</span>
+                    <span x-text="trainSuccessMsg"></span>
+                </div>
+
+                <div x-show="trainErrorMsg" x-cloak class="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs font-bold flex items-center space-x-1">
+                    <span>✕</span>
+                    <span x-text="trainErrorMsg"></span>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                    <button type="button" @click="trainModalOpen = false" class="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl text-xs hover:bg-slate-200">বাতিল</button>
+                    <button type="submit" :disabled="trainingSaving" class="px-5 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-extrabold rounded-xl text-xs shadow-md shadow-purple-600/25 active:scale-95 flex items-center gap-1.5">
+                        <span x-text="trainingSaving ? 'সংরক্ষণ হচ্ছে...' : 'সংরক্ষণ করুন ও সফটওয়্যারকে শেখান ⚡'"></span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Multimodal AI Engine (Gemini) Settings Modal -->
+    <div 
+        id="ai-config-modal-backdrop"
+        x-show="aiModalOpen" 
+        x-cloak
+        class="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4">
+        <div 
+            @click.outside="aiModalOpen = false"
+            class="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-md w-full overflow-hidden flex flex-col">
+            
+            <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-purple-50 via-indigo-50 to-blue-50">
+                <div class="flex items-center space-x-2">
+                    <span class="text-xl">🤖</span>
+                    <div>
+                        <h3 class="font-extrabold text-slate-900 text-sm">মাল্টিমোডাল AI সেটিংস</h3>
+                        <p class="text-[11px] text-slate-600">Google Gemini 1.5 Flash Vision & Voice ইন্টিগ্রেশন</p>
+                    </div>
+                </div>
+                <button 
+                    type="button" 
+                    @click="aiModalOpen = false" 
+                    class="w-7 h-7 rounded-full bg-slate-200/60 hover:bg-rose-100 hover:text-rose-600 text-slate-700 font-black flex items-center justify-center transition-colors text-xs">
+                    ✕
+                </button>
+            </div>
+
+            <div class="p-5 space-y-4 text-xs">
+                <!-- Status Banner -->
+                <div class="p-3 rounded-2xl border flex items-center justify-between"
+                     :class="isAiActive ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-amber-50 border-amber-200 text-amber-800'">
+                    <div class="flex items-center space-x-2">
+                        <span class="text-base" x-text="isAiActive ? '✨' : '⚙️'"></span>
+                        <div>
+                            <div class="font-bold" x-text="isAiActive ? 'Gemini 1.5 Flash সক্রিয়' : 'লোকাল স্মার্ট ইঞ্জিন চলমান'"></div>
+                            <div class="text-[10px]" x-text="isAiActive ? 'ক্যামেরা ও ভয়েসে সুপার-হিউম্যান অ্যাকুরেসি চালু রয়েছে' : 'ফ্রি Gemini API Key দিলে ক্যামেরা স্ক্যান ১০০% নির্ভুল হবে'"></div>
+                        </div>
+                    </div>
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold"
+                          :class="isAiActive ? 'bg-emerald-200 text-emerald-900' : 'bg-amber-200 text-amber-900'"
+                          x-text="isAiActive ? 'ACTIVE' : 'OFFLINE MODE'"></span>
+                </div>
+
+                <!-- API Key Input -->
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <label class="font-bold text-slate-700">Google Gemini API Key</label>
+                        <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" class="text-[11px] text-indigo-600 hover:underline font-bold flex items-center gap-0.5">
+                            <span>🔑 ফ্রি Key নিন</span>
+                            <span>↗</span>
+                        </a>
+                    </div>
+                    <div class="relative">
+                        <input 
+                            :type="showApiKey ? 'text' : 'password'" 
+                            x-model="geminiApiKey" 
+                            placeholder="AIzaSy... (আপনার Gemini API কী এখানে পেস্ট করুন)" 
+                            class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 pr-16 text-xs font-mono font-bold text-slate-800 focus:ring-2 focus:ring-purple-500 focus:outline-none">
+                        <button 
+                            type="button" 
+                            @click="showApiKey = !showApiKey" 
+                            class="absolute right-2 top-2 px-2 py-0.5 text-[10px] font-bold text-slate-500 hover:text-slate-700 bg-slate-200 rounded">
+                            <span x-text="showApiKey ? 'লুকান' : 'দেখুন'"></span>
+                        </button>
+                    </div>
+                    <p class="text-[10px] text-slate-400 mt-1">Google AI Studio থেকে সম্পূর্ণ বিনামূল্যে (Free of cost) API কী নেওয়া যায়।</p>
+                </div>
+
+                <!-- Preferred Engine Selector -->
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">পছন্দের AI ইঞ্জিন</label>
+                    <select x-model="aiEnginePreference" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-purple-500 focus:outline-none">
+                        <option value="gemini">Google Gemini 1.5 Flash (সুপার নির্ভুল - রিকমেন্ডেড)</option>
+                        <option value="local">লোকাল স্মার্ট ইঞ্জিন (Offline Tesseract + Multi-Signal)</option>
+                    </select>
+                </div>
+
+                <!-- Test Connection Message -->
+                <div x-show="aiTestMsg" x-cloak class="p-2.5 rounded-xl text-xs font-bold flex items-center space-x-1"
+                     :class="aiTestSuccess ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200'">
+                    <span x-text="aiTestSuccess ? '✓' : '✕'"></span>
+                    <span x-text="aiTestMsg"></span>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex items-center justify-between pt-2 border-t border-slate-100">
+                    <button 
+                        type="button" 
+                        @click="testAiConnection()" 
+                        :disabled="aiTesting"
+                        class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-colors flex items-center gap-1">
+                        <span x-text="aiTesting ? 'পরীক্ষা হচ্ছে...' : '⚡ কানেকশন টেস্ট'"></span>
+                    </button>
+                    <div class="flex items-center space-x-2">
+                        <button type="button" @click="aiModalOpen = false" class="px-3 py-2 bg-slate-100 text-slate-600 font-bold rounded-xl text-xs hover:bg-slate-200">বাতিল</button>
+                        <button 
+                            type="button" 
+                            @click="saveAiConfig()" 
+                            :disabled="aiSaving"
+                            class="px-5 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-extrabold rounded-xl text-xs shadow-md shadow-purple-600/25 active:scale-95 flex items-center gap-1.5">
+                            <span x-text="aiSaving ? 'সংরক্ষণ হচ্ছে...' : 'সংরক্ষণ করুন ✓'"></span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tender & Checkout Modal (HTMX Loaded) -->
+    <div 
+        id="checkout-modal-backdrop"
+        x-show="checkoutModalOpen" 
+        x-cloak
+        class="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div 
+            @click.outside="checkoutModalOpen = false"
+            id="checkout-modal-content"
+            class="bg-white rounded-t-3xl sm:rounded-3xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden max-h-[90vh] flex flex-col pb-safe">
+            <!-- HTMX injects checkout modal partial here -->
+        </div>
+    </div>
+
+    <!-- Receipt Preview Modal -->
+    <div 
+        id="receipt-modal-backdrop"
+        x-show="receiptModalOpen" 
+        x-cloak
+        class="fixed inset-0 z-50 bg-slate-900/75 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+        <div 
+            @click.outside="receiptModalOpen = false"
+            id="receipt-modal-content"
+            class="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-md w-full overflow-hidden max-h-[92vh] flex flex-col">
+            <!-- HTMX injects printable receipt partial here -->
+        </div>
+    </div>
+
+    <!-- Recent Invoices Modal -->
+    <div 
+        id="recent-invoices-modal" 
+        class="fixed inset-0 z-50 bg-slate-900/75 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 hidden">
+        <div 
+            id="recent-invoices-modal-content"
+            class="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-3xl w-full overflow-hidden max-h-[92vh] flex flex-col">
+            <!-- HTMX injects recent invoices partial here -->
+        </div>
+    </div>
+
+    <!-- Held Carts Modal -->
+    <div 
+        id="held-carts-modal" 
+        class="fixed inset-0 z-50 bg-slate-900/75 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 hidden">
+        <div 
+            id="held-carts-modal-content"
+            class="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden max-h-[92vh] flex flex-col">
+            <!-- HTMX injects held carts partial here -->
+        </div>
+    </div>
+
+</div>
+
+<!-- Alpine.js POS Terminal Controller -->
+<script>
+function posTerminal() {
+    return {
+        currentTime: new Date().toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' }),
+        searchOpen: false,
+        mobileMenuOpen: false,
+        sidebarOpen: false,
+        mobileDrawerOpen: false,
+        addDrugModalOpen: false,
+        newDrugName: '',
+        cameraModalOpen: false,
+        hasScanResults: false,
+        checkoutModalOpen: false,
+        receiptModalOpen: false,
+        trainModalOpen: false,
+        trainAlias: '',
+        trainBrand: '',
+        trainingSaving: false,
+        trainSuccessMsg: '',
+        trainErrorMsg: '',
+        aiModalOpen: false,
+        geminiApiKey: '',
+        showApiKey: false,
+        isAiActive: false,
+        aiEnginePreference: 'gemini',
+        aiTesting: false,
+        aiTestMsg: '',
+        aiTestSuccess: false,
+        aiSaving: false,
+        ocrScanning: false,
+        isListening: false,
+        speechTranscript: '',
+        recognition: null,
+        videoStream: null,
+        torchOn: false,
+
+        init() {
+            setInterval(() => {
+                this.currentTime = new Date().toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' });
+            }, 1000);
+            this.setupVoiceRecognition();
+            this.loadAiStatus();
+        },
+
+        handleGlobalKeydown(e) {
+            if (e.key === 'F2') {
+                e.preventDefault();
+                this.$refs.searchInput?.focus();
+                this.searchOpen = true;
+            } else if (e.key === 'F3') {
+                e.preventDefault();
+                this.toggleVoice();
+            } else if (e.key === 'F4') {
+                e.preventDefault();
+                this.$refs.discountInput?.focus();
+                this.$refs.discountInput?.select();
+            } else if (e.key === 'F8') {
+                e.preventDefault();
+                if (confirm('আপনি কি সম্পূর্ণ কার্টটি মুছে ফেলতে চান?')) {
+                    htmx.ajax('POST', "{% url 'pos:cart_clear' %}", {
+                        target: '#cart-container',
+                        swap: 'outerHTML'
+                    });
+                }
+            } else if (e.key === 'F6') {
+                e.preventDefault();
+                this.openCameraModal();
+            } else if (e.key === 'F7') {
+                e.preventDefault();
+                this.openTrainModal('');
+            } else if (e.key === 'Enter' && !this.checkoutModalOpen && !this.cameraModalOpen && !this.addDrugModalOpen && !this.trainModalOpen && document.activeElement.tagName !== 'INPUT') {
+                e.preventDefault();
+                this.openCheckoutModal();
+            } else if (e.key === 'Escape') {
+                this.searchOpen = false;
+                this.stopVoice();
+                this.closeCameraModal();
+                this.checkoutModalOpen = false;
+                this.receiptModalOpen = false;
+                this.addDrugModalOpen = false;
+                this.mobileMenuOpen = false;
+                this.mobileDrawerOpen = false;
+            }
+        },
+
+        openAddDrugModal(prefillName) {
+            this.newDrugName = prefillName || '';
+            this.addDrugModalOpen = true;
+            this.searchOpen = false;
+        },
+
+        setupVoiceRecognition() {
+            const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRec) return;
+            this.recognition = new SpeechRec();
+            this.recognition.lang = 'bn-BD';
+            this.recognition.continuous = false;
+            this.recognition.interimResults = true;
+
+            this.recognition.onresult = (event) => {
+                let transcript = '';
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    transcript += event.results[i][0].transcript;
+                }
+                this.speechTranscript = transcript;
+                if (event.results[0].isFinal) {
+                    this.sendVoiceToBackend(transcript);
+                }
+            };
+
+            this.recognition.onend = () => {
+                this.isListening = false;
+            };
+
+            this.recognition.onerror = () => {
+                this.isListening = false;
+            };
+        },
+
+        toggleVoice() {
+            if (!this.recognition) {
+                alert("আপনার ব্রাউজারে Web Speech API সাপোর্ট নেই। দয়া করে Google Chrome বা Safari ব্যবহার করুন।");
+                return;
+            }
+            if (this.isListening) {
+                this.stopVoice();
+            } else {
+                this.speechTranscript = '';
+                this.isListening = true;
+                try { this.recognition.start(); } catch(e){}
+            }
+        },
+
+        stopVoice() {
+            if (this.recognition && this.isListening) {
+                this.recognition.stop();
+            }
+            this.isListening = false;
+        },
+
+        sendVoiceToBackend(text) {
+            htmx.ajax('POST', "{% url 'pos:voice_parse' %}", {
+                target: '#cart-container',
+                swap: 'outerHTML',
+                values: { 'transcript': text }
+            });
+        },
+
+        async openCameraModal() {
+            this.cameraModalOpen = true;
+            this.torchOn = false;
+
+            // Reset results display
+            const resultsBox = document.getElementById('camera-scan-results-box');
+            if (resultsBox) {
+                resultsBox.innerHTML = '<p class="text-xs text-slate-500 text-center">ক্যামেরার সামনে ঔষধের নাম সোজাভাবে ধরে "স্ক্যান ও ম্যাচ করুন" চাপুন</p>';
+            }
+
+            await this.$nextTick();
+            const video = document.getElementById('camera-video-feed');
+            const loadingIndicator = document.getElementById('camera-loading-indicator');
+            if (loadingIndicator) loadingIndicator.style.display = 'flex';
+
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                if (loadingIndicator) loadingIndicator.style.display = 'none';
+                if (resultsBox) {
+                    resultsBox.innerHTML = `
+                        <div class="p-3 bg-rose-50 border border-rose-200 rounded-xl text-center text-rose-700 text-xs">
+                            <p class="font-bold">❌ ব্রাউজারে ক্যামেরা সাপোর্ট নেই</p>
+                            <p class="mt-1">নিচের "ছবি আপলোড" বাটন ব্যবহার করে ছবি সিলেক্ট করুন।</p>
+                        </div>`;
+                }
+                return;
+            }
+
+            // Progressive camera constraint ladder: Mobile Back Cam -> Front Cam -> Generic
+            const constraintTiers = [
+                { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } } },
+                { video: { facingMode: { ideal: 'environment' } } },
+                { video: { facingMode: 'user' } },
+                { video: true }
+            ];
+
+            let activeStream = null;
+            let lastErr = null;
+
+            for (const c of constraintTiers) {
+                try {
+                    activeStream = await navigator.mediaDevices.getUserMedia(c);
+                    if (activeStream) break;
+                } catch (err) {
+                    lastErr = err;
+                    console.warn("Camera tier failed, trying next tier:", c, err);
+                }
+            }
+
+            if (!activeStream) {
+                console.error("All camera tiers failed:", lastErr);
+                if (loadingIndicator) loadingIndicator.style.display = 'none';
+                if (resultsBox) {
+                    resultsBox.innerHTML = `
+                        <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-center text-amber-800 text-xs">
+                            <p class="font-bold">⚠️ ক্যামেরা চালু করা যায়নি</p>
+                            <p class="mt-1 text-[11px] text-amber-700 font-mono">${lastErr ? (lastErr.name + ': ' + lastErr.message) : 'Permission denied'}</p>
+                            <p class="mt-2 text-slate-600 text-[11px]">ব্রাউজারে ক্যামেরা পারমিশন এলাউ করুন, অথবা সরাসরি <strong>"ছবি আপলোড"</strong> বাটনে ক্লিক করে ছবি তুলে স্ক্যান করুন।</p>
+                        </div>`;
+                }
+                return;
+            }
+
+            this.videoStream = activeStream;
+
+            if (video) {
+                video.srcObject = activeStream;
+                video.muted = true;
+                video.playsInline = true;
+                video.setAttribute('playsinline', 'true');
+                video.setAttribute('autoplay', 'true');
+
+                video.onloadedmetadata = () => {
+                    video.play().catch(e => console.warn("Video play error on metadata:", e));
+                    if (loadingIndicator) loadingIndicator.style.display = 'none';
+                };
+
+                video.onplaying = () => {
+                    if (loadingIndicator) loadingIndicator.style.display = 'none';
+                };
+
+                // Explicit play trigger
+                video.play().catch(e => console.warn("Initial video play error:", e));
+            }
+
+            // Apply 2x hardware zoom if supported by mobile back sensor
+            setTimeout(() => {
+                try {
+                    const track = activeStream.getVideoTracks()[0];
+                    if (track && track.getCapabilities) {
+                        const caps = track.getCapabilities();
+                        if (caps.zoom) {
+                            const targetZoom = Math.min(2.0, caps.zoom.max || 1.5);
+                            track.applyConstraints({
+                                advanced: [{ zoom: targetZoom }]
+                            }).catch(e => console.log("2x hardware zoom constraint not applied:", e));
+                        }
+                    }
+                } catch (zErr) {
+                    console.log("Zoom error:", zErr);
+                }
+            }, 400);
+        },
+
+        handleFileUpload(event) {
+            const file = event.target.files && event.target.files[0];
+            if (!file) return;
+
+            this.ocrScanning = true;
+            const formData = new FormData();
+            formData.append('image', file, file.name);
+
+            fetch("{% url 'pos:camera_scan' %}", {
+                method: "POST",
+                headers: {
+                    "HX-Request": "true"
+                },
+                body: formData
+            })
+            .then(res => res.text())
+            .then(html => {
+                const resultsBox = document.getElementById('camera-scan-results-box');
+                if (resultsBox) {
+                    resultsBox.innerHTML = html;
+                    if (window.Alpine) {
+                        try { Alpine.initTree(resultsBox); } catch (e) {}
+                    }
+                }
+                this.hasScanResults = true;
+            })
+            .catch(err => {
+                console.error("Upload OCR error:", err);
+                const resultsBox = document.getElementById('camera-scan-results-box');
+                if (resultsBox) {
+                    resultsBox.innerHTML = `<div class="p-3 text-xs text-rose-600 text-center font-bold">স্ক্যান ব্যর্থ হয়েছে: ${err.message}</div>`;
+                }
+            })
+            .finally(() => {
+                this.ocrScanning = false;
+                event.target.value = '';
+            });
+        },
+
+        openTrainModal(initialText = '') {
+            this.trainAlias = initialText || '';
+            this.trainBrand = '';
+            this.trainSuccessMsg = '';
+            this.trainErrorMsg = '';
+            this.trainModalOpen = true;
+        },
+
+        async submitMedicineTraining() {
+            if (!this.trainAlias.trim() || !this.trainBrand.trim()) return;
+            this.trainingSaving = true;
+            this.trainSuccessMsg = '';
+            this.trainErrorMsg = '';
+
+            const formData = new FormData();
+            formData.append('alias', this.trainAlias.trim());
+            formData.append('brand_name', this.trainBrand.trim());
+
+            try {
+                const resp = await fetch("{% url 'pos:train_medicine' %}", {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await resp.json();
+                if (data.status === 'success') {
+                    this.trainSuccessMsg = data.message;
+                    setTimeout(() => {
+                        this.trainModalOpen = false;
+                        this.trainSuccessMsg = '';
+                    }, 2000);
+                } else {
+                    this.trainErrorMsg = data.message || 'সংরক্ষণ ব্যর্থ হয়েছে';
+                }
+            } catch (e) {
+                this.trainErrorMsg = 'সার্ভার যোগাযোগে সমস্যা হয়েছে';
+            } finally {
+                this.trainingSaving = false;
+            }
+        },
+
+        async loadAiStatus() {
+            try {
+                const resp = await fetch("{% url 'pos:ai_config' %}");
+                const data = await resp.json();
+                if (data.status === 'success') {
+                    this.isAiActive = !!data.is_active;
+                    this.aiEnginePreference = data.preferred_engine || 'gemini';
+                }
+            } catch (e) {
+                console.log("Could not load AI status:", e);
+            }
+        },
+
+        async openAiConfigModal() {
+            this.aiTestMsg = '';
+            try {
+                const resp = await fetch("{% url 'pos:ai_config' %}");
+                const data = await resp.json();
+                if (data.status === 'success') {
+                    this.isAiActive = !!data.is_active;
+                    this.aiEnginePreference = data.preferred_engine || 'gemini';
+                    if (data.has_key) {
+                        this.geminiApiKey = data.masked_key;
+                    }
+                }
+            } catch (e){}
+            this.aiModalOpen = true;
+        },
+
+        async testAiConnection() {
+            this.aiTesting = true;
+            this.aiTestMsg = '';
+            const formData = new FormData();
+            formData.append('gemini_api_key', this.geminiApiKey.trim());
+
+            try {
+                const resp = await fetch("{% url 'pos:ai_test_connection' %}", {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await resp.json();
+                this.aiTestSuccess = data.status === 'success';
+                this.aiTestMsg = data.message;
+            } catch (e) {
+                this.aiTestSuccess = false;
+                this.aiTestMsg = 'কানেকশন টেস্টে সমস্যা হয়েছে';
+            } finally {
+                this.aiTesting = false;
+            }
+        },
+
+        async saveAiConfig() {
+            this.aiSaving = true;
+            const formData = new FormData();
+            formData.append('gemini_api_key', this.geminiApiKey.trim());
+            formData.append('preferred_engine', this.aiEnginePreference);
+            formData.append('enabled', 'true');
+
+            try {
+                const resp = await fetch("{% url 'pos:ai_config' %}", {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await resp.json();
+                if (data.status === 'success') {
+                    this.isAiActive = !!data.is_active;
+                    this.aiTestSuccess = true;
+                    this.aiTestMsg = data.message;
+                    setTimeout(() => {
+                        this.aiModalOpen = false;
+                        this.aiTestMsg = '';
+                    }, 1500);
+                } else {
+                    this.aiTestSuccess = false;
+                    this.aiTestMsg = data.message || 'সংরক্ষণ ব্যর্থ হয়েছে';
+                }
+            } catch (e) {
+                this.aiTestSuccess = false;
+                this.aiTestMsg = 'সার্ভার যোগাযোগ ব্যর্থ হয়েছে';
+            } finally {
+                this.aiSaving = false;
+            }
+        },
+
+        toggleFlashlight() {
+            if (this.videoStream) {
+                const track = this.videoStream.getVideoTracks()[0];
+                if (track) {
+                    this.torchOn = !this.torchOn;
+                    track.applyConstraints({
+                        advanced: [{ torch: this.torchOn }]
+                    }).catch(err => {
+                        console.warn("Torch not supported on this device", err);
+                        this.torchOn = false;
+                        alert("আপনার ডিভাইসে ফ্লাশলাইট সাপোর্ট করে না।");
+                    });
+                }
+            }
+        },
+
+        closeCameraModal() {
+            this.cameraModalOpen = false;
+            this.hasScanResults = false;
+            this.torchOn = false;
+            if (this.videoStream) {
+                this.videoStream.getTracks().forEach(t => t.stop());
+                this.videoStream = null;
+            }
+        },
+
+        stopCamera() {
+            this.closeCameraModal();
+        },
+
+        sendDetectedToSearch(medicineName) {
+            this.closeCameraModal();
+            const searchInput = document.getElementById('drug-search-input');
+            if (searchInput && medicineName) {
+                searchInput.value = medicineName;
+                this.searchOpen = true;
+                searchInput.focus();
+                searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+                htmx.trigger(searchInput, 'keyup');
+            }
+        },
+
+        captureAndScan() {
+            const video = document.getElementById('camera-video-feed');
+            const reticle = document.getElementById('camera-reticle-box');
+            const canvas = document.getElementById('camera-capture-canvas');
+            if (!video || !canvas) return;
+
+            const vw = video.videoWidth || 1920;
+            const vh = video.videoHeight || 1080;
+
+            // 1. Calculate pixel-perfect coordinates of the green reticle box on native camera stream
+            let sx = 0, sy = 0, sWidth = vw, sHeight = vh;
+            if (reticle && video.clientWidth > 0 && video.clientHeight > 0) {
+                const vRect = video.getBoundingClientRect();
+                const rRect = reticle.getBoundingClientRect();
+
+                // Compute aspect ratios to handle CSS object-cover scaling correctly
+                const videoAspect = vw / vh;
+                const elementAspect = vRect.width / vRect.height;
+                
+                let renderedWidth = vRect.width;
+                let offsetX = 0;
+                let offsetY = 0;
+
+                if (videoAspect > elementAspect) {
+                    renderedWidth = vRect.height * videoAspect;
+                    offsetX = (renderedWidth - vRect.width) / 2;
+                } else {
+                    const renderedHeight = vRect.width / videoAspect;
+                    offsetY = (renderedHeight - vRect.height) / 2;
+                }
+
+                const scale = vw / renderedWidth;
+
+                const cropLeft = (rRect.left - vRect.left + offsetX) * scale;
+                const cropTop = (rRect.top - vRect.top + offsetY) * scale;
+                const cropW = rRect.width * scale;
+                const cropH = rRect.height * scale;
+
+                sx = Math.max(0, cropLeft);
+                sy = Math.max(0, cropTop);
+                sWidth = Math.min(vw - sx, cropW);
+                sHeight = Math.min(vh - sy, cropH);
+            } else {
+                // Fallback to central 75% width, 45% height
+                sWidth = vw * 0.75;
+                sHeight = vh * 0.45;
+                sx = (vw - sWidth) / 2;
+                sy = (vh - sHeight) / 2;
+            }
+
+            // 2. Render ONLY the cropped green box region onto canvas at full native resolution
+            canvas.width = Math.round(sWidth);
+            canvas.height = Math.round(sHeight);
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, canvas.width, canvas.height);
+
+            // 3. Export high-res cropped image as JPEG and FormData payload
+            const croppedImageData = canvas.toDataURL('image/jpeg', 0.95);
+            this.ocrScanning = true;
+
+            canvas.toBlob(blob => {
+                const formData = new FormData();
+                if (blob) {
+                    formData.append('image', blob, 'cropped_medicine.jpg');
+                }
+                formData.append('image_data', croppedImageData);
+
+                // Execute HTMX POST with FormData payload
+                htmx.ajax('POST', "{% url 'pos:camera_scan' %}", {
+                    target: '#camera-scan-results-box',
+                    swap: 'innerHTML',
+                    values: { 
+                        'image_data': croppedImageData 
+                    }
+                }).finally(() => {
+                    this.ocrScanning = false;
+                    this.hasScanResults = true;
+                });
+            }, 'image/jpeg', 0.95);
+        },
+
+        openCheckoutModal() {
+            const phone = document.getElementById('customer-phone-input')?.value || '';
+            const name = document.getElementById('customer-name-input')?.value || '';
+            
+            htmx.ajax('GET', `{% url 'pos:checkout_modal' %}?phone=${encodeURIComponent(phone)}&name=${encodeURIComponent(name)}`, {
+                target: '#checkout-modal-content',
+                swap: 'innerHTML'
+            });
+            this.checkoutModalOpen = true;
+        }
+    }
+}
+
+function addDrugBatch(batchId) {
+    htmx.ajax('POST', "{% url 'pos:cart_add' %}", {
+        target: '#cart-container',
+        swap: 'outerHTML',
+        values: { 'batch_id': batchId, 'quantity': 1 }
+    });
+}
+
+function addScannedDrugToCart(batchId) {
+    // 1. Close camera modal and stop video stream
+    const posRoot = document.querySelector('[x-data]');
+    if (posRoot && posRoot._x_dataStack && posRoot._x_dataStack[0]) {
+        posRoot._x_dataStack[0].closeCameraModal();
+    } else if (posRoot && posRoot.__x) {
+        posRoot.__x.$data.closeCameraModal();
+    }
+    // 2. Add batch to cart
+    addDrugBatch(batchId);
+}
+
+function sendDetectedToSearch(medicineName) {
+    // 1. Close modal and stop camera
+    const posRoot = document.querySelector('[x-data]');
+    if (posRoot && posRoot._x_dataStack && posRoot._x_dataStack[0]) {
+        posRoot._x_dataStack[0].closeCameraModal();
+        posRoot._x_dataStack[0].searchOpen = true;
+    } else if (posRoot && posRoot.__x) {
+        posRoot.__x.$data.closeCameraModal();
+        posRoot.__x.$data.searchOpen = true;
+    }
+    
+    // 2. Populate search input and trigger search
+    const searchInput = document.getElementById('drug-search-input');
+    if (searchInput && medicineName) {
+        searchInput.value = medicineName;
+        searchInput.focus();
+        searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+        htmx.trigger(searchInput, 'keyup');
+    }
+}
+
+function openTrainModalFromScan(rawText) {
+    const posRoot = document.querySelector('[x-data]');
+    if (posRoot && posRoot._x_dataStack && posRoot._x_dataStack[0]) {
+        posRoot._x_dataStack[0].closeCameraModal();
+        posRoot._x_dataStack[0].openTrainModal(rawText);
+    } else if (posRoot && posRoot.__x) {
+        posRoot.__x.$data.closeCameraModal();
+        posRoot.__x.$data.openTrainModal(rawText);
+    }
+}
+
+document.body.addEventListener('htmx:afterSwap', function(evt) {
+    if (window.Alpine && evt.detail && evt.detail.target) {
+        try {
+            Alpine.initTree(evt.detail.target);
+        } catch (e) {
+            console.warn("Alpine initTree error:", e);
+        }
+    }
+    if (evt.detail && evt.detail.target && evt.detail.target.id === 'camera-scan-results-box') {
+        const posRoot = document.querySelector('[x-data]');
+        if (posRoot && posRoot._x_dataStack && posRoot._x_dataStack[0]) {
+            posRoot._x_dataStack[0].hasScanResults = true;
+        } else if (posRoot && posRoot.__x) {
+            posRoot.__x.$data.hasScanResults = true;
+        }
+    }
+    const itemsBadge = document.getElementById('total-items-badge');
+    if (itemsBadge && itemsBadge.innerText.trim() === '0') {
+        const pInput = document.getElementById('discount-percent-input');
+        const fInput = document.getElementById('discount-flat-input');
+        if (pInput && document.activeElement !== pInput) pInput.value = '0.00';
+        if (fInput && document.activeElement !== fInput) fInput.value = '0.00';
+    }
+});
+</script>
+{% endblock %}

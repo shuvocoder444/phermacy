@@ -1,0 +1,150 @@
+<div class="p-5 sm:p-6 bg-white overflow-y-auto max-h-[88vh] pb-safe" x-data="{
+    paymentMethod: 'CASH',
+    totalPayable: {{ cart.total_payable }},
+    paidAmount: {{ cart.total_payable }},
+    get changeAmount() {
+        let paid = parseFloat(this.paidAmount) || 0;
+        let diff = paid - this.totalPayable;
+        return diff > 0 ? diff.toFixed(2) : '0.00';
+    },
+    get dueAmount() {
+        let paid = parseFloat(this.paidAmount) || 0;
+        let diff = this.totalPayable - paid;
+        return diff > 0 ? diff.toFixed(2) : '0.00';
+    }
+}">
+    <!-- Header -->
+    <div class="flex items-center justify-between pb-3 sm:pb-4 border-b border-slate-100">
+        <div class="flex items-center space-x-2.5 sm:space-x-3">
+            <div class="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-emerald-100 text-emerald-700 border border-emerald-200 flex items-center justify-center font-bold text-lg sm:text-xl">
+                ৳
+            </div>
+            <div>
+                <h3 class="text-base sm:text-lg font-bold text-slate-800">পেমেন্ট গ্রহণ ও টেন্ডার</h3>
+                <p class="text-xs text-slate-500">মোট আইটেম: {{ cart.total_items_count }}টি</p>
+            </div>
+        </div>
+        <div class="text-right">
+            <div class="text-[11px] sm:text-xs text-slate-400 uppercase font-semibold">সর্বমোট প্রদেয়</div>
+            <div class="text-xl sm:text-2xl font-black text-emerald-600 font-mono">৳{{ cart.total_payable }}</div>
+        </div>
+    </div>
+
+    <!-- Form -->
+    <form hx-post="{% url 'pos:checkout_submit' %}" hx-target="#modal-content" class="mt-4 sm:mt-5 space-y-3 sm:space-y-4">
+        
+        <!-- Customer & Due Details -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 bg-slate-50 p-3 sm:p-4 rounded-2xl border border-slate-200">
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">কাস্টমার ফোন (বাকি / SMS)</label>
+                <input 
+                    type="text" 
+                    name="customer_phone" 
+                    value="{{ customer.phone|default:cart.customer_phone }}"
+                    placeholder="017xxxxxxxx"
+                    class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-800 font-mono font-bold focus:border-emerald-500 focus:outline-none shadow-sm">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">কাস্টমার নাম</label>
+                <input 
+                    type="text" 
+                    name="customer_name" 
+                    value="{{ customer.name|default:cart.customer_name }}"
+                    placeholder="Walk-in Customer"
+                    class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-800 font-medium focus:border-emerald-500 focus:outline-none shadow-sm">
+            </div>
+        </div>
+
+        <!-- Payment Method Selection -->
+        <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1.5">পেমেন্ট মাধ্যম বেছে নিন</label>
+            <div class="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                <button 
+                    type="button" 
+                    @click="paymentMethod = 'CASH'; paidAmount = totalPayable"
+                    :class="paymentMethod === 'CASH' ? 'bg-emerald-600 text-white border-emerald-600 ring-2 ring-emerald-400' : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'"
+                    class="p-2 sm:p-3 rounded-2xl border text-xs font-bold text-center transition-all shadow-sm active:scale-95">
+                    💵 ক্যাশ
+                </button>
+                <button 
+                    type="button" 
+                    @click="paymentMethod = 'BKASH'; paidAmount = totalPayable"
+                    :class="paymentMethod === 'BKASH' ? 'bg-[#D12053] text-white border-pink-500 ring-2 ring-pink-400' : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'"
+                    class="p-2 sm:p-3 rounded-2xl border text-xs font-bold text-center transition-all shadow-sm active:scale-95">
+                    bKash
+                </button>
+                <button 
+                    type="button" 
+                    @click="paymentMethod = 'NAGAD'; paidAmount = totalPayable"
+                    :class="paymentMethod === 'NAGAD' ? 'bg-[#F7931E] text-white border-amber-500 ring-2 ring-amber-400' : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'"
+                    class="p-2 sm:p-3 rounded-2xl border text-xs font-bold text-center transition-all shadow-sm active:scale-95">
+                    Nagad
+                </button>
+                <button 
+                    type="button" 
+                    @click="paymentMethod = 'ROCKET'; paidAmount = totalPayable"
+                    :class="paymentMethod === 'ROCKET' ? 'bg-[#8B1A8B] text-white border-purple-500 ring-2 ring-purple-400' : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'"
+                    class="p-2 sm:p-3 rounded-2xl border text-xs font-bold text-center transition-all shadow-sm active:scale-95">
+                    Rocket
+                </button>
+                <button 
+                    type="button" 
+                    @click="paymentMethod = 'DUE'; paidAmount = 0"
+                    :class="paymentMethod === 'DUE' ? 'bg-rose-600 text-white border-rose-600 ring-2 ring-rose-400' : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'"
+                    class="col-span-2 sm:col-span-1 p-2 sm:p-3 rounded-2xl border text-xs font-bold text-center transition-all shadow-sm active:scale-95">
+                    📜 বাকি (Due)
+                </button>
+            </div>
+            <input type="hidden" name="payment_method" :value="paymentMethod">
+        </div>
+
+        <!-- TrxID for Digital Payments -->
+        <div x-show="['BKASH', 'NAGAD', 'ROCKET'].includes(paymentMethod)" x-cloak>
+            <label class="block text-xs font-bold text-slate-700 mb-1">MFS Transaction ID (TrxID)</label>
+            <input 
+                type="text" 
+                name="gateway_trx_id" 
+                placeholder="যেমন: 9J87AKL9"
+                class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-800 font-mono uppercase focus:border-emerald-500 focus:outline-none shadow-sm">
+        </div>
+
+        <!-- Paid Amount & Realtime Calculations -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">প্রাপ্ত টাকা (৳ Received)</label>
+                <input 
+                    type="number" 
+                    step="0.01" 
+                    name="paid_amount" 
+                    x-model="paidAmount"
+                    class="w-full bg-white border-2 border-emerald-500 rounded-xl px-3 py-2 text-sm sm:text-base font-black text-emerald-700 font-mono focus:outline-none shadow-sm">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">ফেরত (Change ৳)</label>
+                <div class="w-full bg-slate-100 border border-slate-200 rounded-xl px-3 py-2 text-sm sm:text-base font-black text-blue-700 font-mono" x-text="'৳' + changeAmount">
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">বকেয়া (Due ৳)</label>
+                <div class="w-full bg-rose-50 border border-rose-200 rounded-xl px-3 py-2 text-sm sm:text-base font-black text-rose-700 font-mono" x-text="'৳' + dueAmount">
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex items-center justify-between sm:justify-end space-x-2 sm:space-x-3 pt-3 sm:pt-4 border-t border-slate-100">
+            <button 
+                type="button" 
+                @click="checkoutModalOpen = false; $dispatch('close-modal')"
+                class="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors">
+                বাতিল
+            </button>
+            <button 
+                type="submit" 
+                class="px-5 sm:px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs sm:text-sm shadow-lg shadow-emerald-600/25 flex items-center space-x-2 transition-all active:scale-95">
+                <span>কনফার্ম ও স্লিপ প্রিন্ট</span>
+                <kbd class="hidden sm:inline-block px-1.5 py-0.5 rounded bg-emerald-800 text-xs font-mono">Enter</kbd>
+            </button>
+        </div>
+    </form>
+</div>
