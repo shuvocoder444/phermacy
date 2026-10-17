@@ -231,8 +231,10 @@
                         </div>
                         <input 
                             type="text" 
+                            id="drug-search-input"
+                            x-ref="searchInput"
                             x-model="quickSearch"
-                            placeholder="তালিকায় নাম দিয়ে ফিল্টার করুন..." 
+                            placeholder="তালিকায় নাম দিয়ে ফিল্টার করুন... (F2)" 
                             class="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-800 placeholder-slate-400 font-medium focus:bg-white focus:border-emerald-500 focus:outline-none transition-all">
                     </div>
 
@@ -365,70 +367,34 @@
         <footer class="bg-white border-t-2 border-slate-200/90 px-3 sm:px-5 py-2.5 shrink-0 z-30 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]">
             <div class="flex flex-col xl:flex-row items-center justify-between gap-2.5">
                 
-                <!-- Left: Customer & Cart Actions -->
-                <div class="flex flex-wrap items-center gap-2 w-full xl:w-auto justify-between sm:justify-start">
-                    
+                <!-- Left: Big Checkout Button & Grand Net Total (User Requested: Left Side) -->
+                <div class="flex items-center gap-3 w-full xl:w-auto justify-between sm:justify-start">
+                    <!-- Big Instant Tender / Checkout Trigger Button -->
+                    <button 
+                        type="button" 
+                        @click="openCheckoutModal()"
+                        class="py-2.5 sm:py-3 px-5 sm:px-6 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-extrabold rounded-2xl shadow-lg shadow-emerald-600/30 flex items-center space-x-2 transition-all transform active:scale-95 cursor-pointer text-sm sm:text-base shrink-0">
+                        <span>⚡ চেকআউট ও পেমেন্ট</span>
+                        <span class="font-mono font-black text-sm hidden lg:inline" id="cart-btn-grand-total">৳{{ cart.grand_total|default:cart.total_payable|default:'0.00' }}</span>
+                        <span class="text-xs bg-emerald-800/50 px-2 py-0.5 rounded-lg font-mono">⏎ Enter</span>
+                    </button>
+
+                    <!-- Grand Total Net Amount (Large Font) -->
+                    <div class="text-left px-2 sm:px-3 border-l-2 border-slate-200 shrink-0">
+                        <span class="text-[10px] uppercase font-black text-slate-400 tracking-wider block leading-none mb-0.5">সর্বমোট (Net Total)</span>
+                        <span class="text-2xl sm:text-3xl font-black text-emerald-600 font-mono tracking-tight leading-none" id="cart-grand-total">৳{{ cart.grand_total|default:cart.total_payable|default:'0.00' }}</span>
+                    </div>
+
                     <!-- Items Count Badge -->
-                    <div class="flex items-center space-x-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl">
+                    <div class="hidden sm:flex items-center space-x-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl shrink-0">
                         <span class="text-xs text-slate-500 font-bold">কার্ট আইটেম:</span>
                         <strong class="text-emerald-700 font-black text-sm font-mono" id="total-items-badge">{{ cart.total_items_count|default:0 }}</strong>
                         <span class="text-xs text-slate-400 font-medium">টি</span>
                     </div>
-
-                    <!-- Cart Hold & Clear Buttons -->
-                    <button 
-                        type="button" 
-                        hx-post="{% url 'pos:cart_clear' %}" 
-                        hx-target="#cart-container"
-                        hx-swap="outerHTML"
-                        hx-confirm="আপনি কি সম্পূর্ণ কার্টটি মুছে ফেলতে চান?"
-                        class="px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold transition-all active:scale-95 flex items-center space-x-1"
-                        title="কার্ট খালি করুন [F8]">
-                        <span>🗑️</span>
-                        <span>খালি [F8]</span>
-                    </button>
-                    
-                    <button 
-                        type="button" 
-                        hx-post="{% url 'pos:hold_cart' %}" 
-                        hx-target="#cart-container"
-                        hx-swap="outerHTML"
-                        class="px-2.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-bold transition-all active:scale-95 flex items-center space-x-1"
-                        title="বর্তমান কার্টটি স্থগিত রাখুন ও পরবর্তী কাস্টমারের বিল করুন">
-                        <span>⏸️</span>
-                        <span>হোল্ড</span>
-                    </button>
-
-                    <button 
-                        type="button" 
-                        hx-get="{% url 'pos:held_carts' %}" 
-                        hx-target="#held-carts-modal-content"
-                        onclick="document.getElementById('held-carts-modal').classList.remove('hidden')"
-                        class="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-xs font-bold transition-all active:scale-95 flex items-center space-x-1"
-                        title="স্থগিত রাখা কার্টগুলো দেখুন ও রিস্টোর করুন">
-                        <span>📂</span>
-                        <span>সংরক্ষিত</span>
-                    </button>
-
-                    <!-- Customer inputs -->
-                    <div class="flex items-center space-x-1.5 sm:ml-2">
-                        <input 
-                            type="text" 
-                            id="customer-phone-input"
-                            placeholder="📱 কাস্টমার মোবাইল"
-                            value="{{ cart.customer_phone }}"
-                            class="w-32 sm:w-36 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-mono font-bold text-slate-800 placeholder-slate-400 focus:bg-white focus:border-emerald-500 focus:outline-none">
-                        <input 
-                            type="text" 
-                            id="customer-name-input"
-                            placeholder="👤 নাম (Walk-in)"
-                            value="{{ cart.customer_name|default:'Walk-in Customer' }}"
-                            class="w-32 sm:w-40 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-slate-800 placeholder-slate-400 focus:bg-white focus:border-emerald-500 focus:outline-none">
-                    </div>
                 </div>
 
-                <!-- Right: Discount Form, Financials Breakdown & Big Checkout Button -->
-                <div class="flex flex-wrap items-center justify-between sm:justify-end gap-3 sm:gap-4 w-full xl:w-auto">
+                <!-- Right: Discount Form, Financials Breakdown, Cart Actions & Customer Info -->
+                <div class="flex flex-wrap items-center justify-between sm:justify-end gap-2.5 sm:gap-3 w-full xl:w-auto">
                     
                     <!-- Inline Discount Form (F4) -->
                     <form 
@@ -436,7 +402,7 @@
                         hx-post="{% url 'pos:cart_discount' %}" 
                         hx-target="#cart-container"
                         hx-swap="outerHTML"
-                        class="flex items-center space-x-1.5 bg-slate-50 border border-slate-200 px-2.5 py-1.5 rounded-xl">
+                        class="flex items-center space-x-1.5 bg-slate-50 border border-slate-200 px-2.5 py-1.5 rounded-xl shrink-0">
                         <span class="text-xs font-bold text-slate-600 flex items-center space-x-1">
                             <span>ছাড়</span>
                             <kbd class="px-1 py-0.5 rounded bg-slate-200 text-[10px] text-emerald-800 font-mono font-bold">F4</kbd>
@@ -473,7 +439,7 @@
                     </form>
 
                     <!-- Subtotal, Discount & VAT Breakdown -->
-                    <div class="hidden sm:flex items-center space-x-3 text-xs">
+                    <div class="hidden lg:flex items-center space-x-3 text-xs shrink-0">
                         <div class="text-right">
                             <span class="text-[10px] text-slate-400 font-bold uppercase block leading-none mb-0.5">সাব-টোটাল</span>
                             <span class="font-mono text-slate-700 font-bold text-xs sm:text-sm" id="cart-subtotal">৳{{ cart.subtotal|default:cart.subtotal_mrp|default:'0.00' }}</span>
@@ -488,21 +454,58 @@
                         </div>
                     </div>
 
-                    <!-- Grand Total Net Amount (Large Font) -->
-                    <div class="text-right pl-2 sm:pl-3 border-l border-slate-200">
-                        <span class="text-[10px] uppercase font-black text-slate-400 tracking-wider block leading-none mb-0.5">সর্বমোট (Net Total)</span>
-                        <span class="text-2xl sm:text-3xl font-black text-emerald-600 font-mono tracking-tight leading-none" id="cart-grand-total">৳{{ cart.grand_total|default:cart.total_payable|default:'0.00' }}</span>
+                    <!-- Cart Hold & Clear Buttons -->
+                    <div class="flex items-center space-x-1.5 shrink-0">
+                        <button 
+                            type="button" 
+                            hx-post="{% url 'pos:cart_clear' %}" 
+                            hx-target="#cart-container"
+                            hx-swap="outerHTML"
+                            hx-confirm="আপনি কি সম্পূর্ণ কার্টটি মুছে ফেলতে চান?"
+                            class="px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold transition-all active:scale-95 flex items-center space-x-1"
+                            title="কার্ট খালি করুন [F8]">
+                            <span>🗑️</span>
+                            <span class="hidden sm:inline">খালি [F8]</span>
+                        </button>
+                        
+                        <button 
+                            type="button" 
+                            hx-post="{% url 'pos:hold_cart' %}" 
+                            hx-target="#cart-container"
+                            hx-swap="outerHTML"
+                            class="px-2.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-bold transition-all active:scale-95 flex items-center space-x-1"
+                            title="বর্তমান কার্টটি স্থগিত রাখুন ও পরবর্তী কাস্টমারের বিল করুন">
+                            <span>⏸️</span>
+                            <span class="hidden sm:inline">হোল্ড</span>
+                        </button>
+
+                        <button 
+                            type="button" 
+                            hx-get="{% url 'pos:held_carts' %}" 
+                            hx-target="#held-carts-modal-content"
+                            onclick="document.getElementById('held-carts-modal').classList.remove('hidden')"
+                            class="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-xs font-bold transition-all active:scale-95 flex items-center space-x-1"
+                            title="স্থগিত রাখা কার্টগুলো দেখুন ও রিস্টোর করুন">
+                            <span>📂</span>
+                            <span class="hidden sm:inline">সংরক্ষিত</span>
+                        </button>
                     </div>
 
-                    <!-- Big Instant Tender / Checkout Trigger Button -->
-                    <button 
-                        type="button" 
-                        @click="openCheckoutModal()"
-                        class="py-2.5 sm:py-3 px-5 sm:px-6 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-extrabold rounded-2xl shadow-lg shadow-emerald-600/30 flex items-center space-x-2 transition-all transform active:scale-95 cursor-pointer text-sm sm:text-base">
-                        <span>⚡ চেকআউট ও পেমেন্ট</span>
-                        <span class="font-mono font-black text-sm hidden lg:inline" id="cart-btn-grand-total">৳{{ cart.grand_total|default:cart.total_payable|default:'0.00' }}</span>
-                        <span class="text-xs bg-emerald-800/50 px-2 py-0.5 rounded-lg font-mono">⏎ Enter</span>
-                    </button>
+                    <!-- Customer inputs -->
+                    <div class="flex items-center space-x-1.5 shrink-0">
+                        <input 
+                            type="text" 
+                            id="customer-phone-input"
+                            placeholder="📱 কাস্টমার মোবাইল"
+                            value="{{ cart.customer_phone }}"
+                            class="w-28 sm:w-32 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-mono font-bold text-slate-800 placeholder-slate-400 focus:bg-white focus:border-emerald-500 focus:outline-none">
+                        <input 
+                            type="text" 
+                            id="customer-name-input"
+                            placeholder="👤 নাম (Walk-in)"
+                            value="{{ cart.customer_name|default:'Walk-in Customer' }}"
+                            class="w-28 sm:w-36 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-slate-800 placeholder-slate-400 focus:bg-white focus:border-emerald-500 focus:outline-none">
+                    </div>
                 </div>
             </div>
         </footer>
