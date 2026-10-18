@@ -9,4 +9,4 @@ urlpatterns = [
     path("add-batch/", views.add_batch_view, name="add_batch"),
     path("autocomplete/", views.drug_autocomplete_view, name="autocomplete"),
     path("batch/<uuid:batch_id>/movements/", views.stock_movement_history, name="movements"),
-]
+] 

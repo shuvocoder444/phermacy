@@ -159,7 +159,7 @@ def add_batch_view(request):
                 dosage_form=dosage,
                 manufacturer=mfg,
                 generic=generic,
-                strength="Standard",
+                strength="Standard", 
                 unit_mrp=unit_mrp,
                 unit_tp=unit_tp,
                 is_active=True
