@@ -4,6 +4,7 @@ from decimal import Decimal
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db.models import Q, Sum
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
@@ -106,6 +107,7 @@ def stock_dashboard(request):
 def add_batch_view(request):
     """
     Adds a new inventory batch for a brand drug with FEFO tracking.
+    Supports both traditional POST redirect and high-speed JSON/HTMX response.
     """
     tenant = getattr(request, "tenant", None)
     
@@ -116,9 +118,15 @@ def add_batch_view(request):
     tp_str = request.POST.get("purchase_price", "").strip()
     mrp_str = request.POST.get("unit_mrp", "").strip()
     challan_no = request.POST.get("challan_no", "").strip()
+    drug_id = request.POST.get("drug_id", "").strip()
+
+    is_ajax = request.headers.get("HX-Request") or request.headers.get("accept") == "application/json" or request.POST.get("is_ajax") == "1"
 
     if not brand_name or not batch_number or not expiry_date_str:
-        messages.error(request, "ঔষধের নাম, ব্যাচ নম্বর এবং মেয়াদোত্তীর্ণের তারিখ আবশ্যক!")
+        err_msg = "ঔষধের নাম, ব্যাচ নম্বর এবং মেয়াদোত্তীর্ণের তারিখ আবশ্যক!"
+        if is_ajax:
+            return JsonResponse({"status": "error", "message": err_msg}, status=400)
+        messages.error(request, err_msg)
         return redirect("inventory:dashboard")
 
     try:
@@ -126,8 +134,17 @@ def add_batch_view(request):
         expiry_date = datetime.strptime(expiry_date_str, "%Y-%m-%d").date()
         qty = int(quantity_str)
         
-        # Drug lookup or fallback
-        drug = BrandDrug.objects.filter(brand_name__iexact=brand_name, is_active=True).first()
+        # Drug lookup
+        drug = None
+        if drug_id:
+            try:
+                drug = BrandDrug.objects.filter(id=drug_id, is_active=True).first()
+            except Exception:
+                pass
+        
+        if not drug:
+            drug = BrandDrug.objects.filter(brand_name__iexact=brand_name, is_active=True).first()
+
         if not drug:
             # Create a quick brand product in catalog if not found
             mfg, _ = Manufacturer.objects.get_or_create(name="General Pharma", defaults={"short_code": "GEN"})
@@ -181,11 +198,65 @@ def add_batch_view(request):
             notes=f"স্টক ইনওয়ার্ড (Supplier Challan: {challan_no})"
         )
 
-        messages.success(request, f"'{drug.brand_name}' ব্যাচ {batch.batch_number} সফলভাবে {qty} পিস স্টক যুক্ত হয়েছে!")
+        success_msg = f"'{drug.brand_name}' ব্যাচ {batch.batch_number} সফলভাবে {qty} পিস স্টক যুক্ত হয়েছে!"
+        if is_ajax:
+            return JsonResponse({
+                "status": "success",
+                "message": success_msg,
+                "batch_id": str(batch.id),
+                "brand_name": drug.brand_name,
+                "current_stock": batch.current_stock,
+            })
+
+        messages.success(request, success_msg)
     except Exception as e:
-        messages.error(request, f"স্টক যোগ করতে ত্রুটি: {e!s}")
+        err_msg = f"স্টক যোগ করতে ত্রুটি: {e!s}"
+        if is_ajax:
+            return JsonResponse({"status": "error", "message": err_msg}, status=400)
+        messages.error(request, err_msg)
 
     return redirect("inventory:dashboard")
+
+
+@tenant_user_required
+@require_GET
+def drug_autocomplete_view(request):
+    """
+    High-speed JSON autocomplete endpoint for medicine catalog search during Stock In.
+    """
+    query = request.GET.get("q", "").strip()
+    if not query:
+        drugs = (
+            BrandDrug.objects.filter(is_active=True)
+            .select_related("generic", "manufacturer", "dosage_form")
+            .order_by("brand_name")[:12]
+        )
+    else:
+        drugs = (
+            BrandDrug.objects.filter(
+                Q(brand_name__icontains=query) |
+                Q(generic__name__icontains=query) |
+                Q(manufacturer__name__icontains=query),
+                is_active=True
+            )
+            .select_related("generic", "manufacturer", "dosage_form")[:15]
+        )
+
+    results = []
+    for d in drugs:
+        dosage = d.dosage_form.short_name if d.dosage_form and d.dosage_form.short_name else (d.dosage_form.name if d.dosage_form else "")
+        results.append({
+            "id": str(d.id),
+            "brand_name": d.brand_name,
+            "strength": d.strength or "",
+            "dosage_form": dosage,
+            "manufacturer": d.manufacturer.name if d.manufacturer else "",
+            "generic": d.generic.name if d.generic else "",
+            "unit_mrp": str(d.unit_mrp),
+            "unit_tp": str(d.unit_tp or (d.unit_mrp * Decimal("0.82")).quantize(Decimal("0.01"))),
+        })
+
+    return JsonResponse({"results": results})
 
 
 @tenant_user_required

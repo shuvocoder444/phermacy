@@ -41,6 +41,14 @@
                 title="নতুন ঔষধ যুক্ত করুন">
                 ➕
             </button>
+            <!-- Mobile Stock In Button -->
+            <button 
+                type="button" 
+                @click="$dispatch('open-stock-in')"
+                class="p-2 rounded-xl bg-teal-50 text-teal-700 border border-teal-200 text-xs font-bold shadow-sm"
+                title="নতুন ব্যাচ স্টক ইন">
+                📦
+            </button>
             <!-- Mobile Voice Button -->
             <button 
                 type="button" 
@@ -103,6 +111,16 @@
                     <span>নতুন ঔষধ</span>
                 </button>
 
+                <!-- Stock Inward Button (Compact) -->
+                <button 
+                    type="button" 
+                    @click="$dispatch('open-stock-in')"
+                    class="px-2.5 py-1.5 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 font-bold flex items-center space-x-1 transition-all shadow-xs active:scale-95 whitespace-nowrap cursor-pointer"
+                    title="নতুন ব্যাচ স্টক ইনওয়ার্ড (Stock In) করুন">
+                    <span>📦</span>
+                    <span>স্টক ইন</span>
+                </button>
+
                 <!-- Camera Scanner Hotkey (Compact) -->
                 <button 
                     type="button" 
@@ -156,6 +174,30 @@
                     title="আজকের তৈরি ইনভয়েসসমূহ দেখুন বা পুনরায় প্রিন্ট করুন">
                     <span>📜</span>
                     <span>রসিদ</span>
+                </button>
+
+                <!-- Hold Cart Button (Moved to Header) -->
+                <button 
+                    type="button" 
+                    hx-post="{% url 'pos:hold_cart' %}" 
+                    hx-target="#cart-container"
+                    hx-swap="outerHTML"
+                    class="px-2.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 font-bold flex items-center space-x-1 transition-all shadow-xs active:scale-95 whitespace-nowrap"
+                    title="বর্তমান কার্টটি স্থগিত রাখুন ও নতুন কাস্টমারের বিল করুন">
+                    <span>⏸️</span>
+                    <span>হোল্ড</span>
+                </button>
+
+                <!-- Held Carts Saved Button (Moved to Header) -->
+                <button 
+                    type="button" 
+                    hx-get="{% url 'pos:held_carts' %}" 
+                    hx-target="#held-carts-modal-content"
+                    onclick="document.getElementById('held-carts-modal').classList.remove('hidden')"
+                    class="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-bold flex items-center space-x-1 transition-all shadow-xs active:scale-95 whitespace-nowrap"
+                    title="স্থগিত রাখা কার্টগুলো দেখুন ও রিস্টোর করুন">
+                    <span>📁</span>
+                    <span>সংরক্ষিত</span>
                 </button>
 
                 <div class="hidden 2xl:flex items-center space-x-1 text-[11px] text-slate-500 font-mono">
@@ -377,14 +419,14 @@
                 
                 <!-- Left: Big Checkout Button & Grand Net Total (User Requested: Left Side) -->
                 <div class="flex items-center gap-3 w-full xl:w-auto justify-between sm:justify-start">
-                    <!-- Big Instant Tender / Checkout Trigger Button -->
+                    <!-- Instant Payment Trigger Button -->
                     <button 
                         type="button" 
                         @click="openCheckoutModal()"
-                        class="py-2.5 sm:py-3 px-5 sm:px-6 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-extrabold rounded-2xl shadow-lg shadow-emerald-600/30 flex items-center space-x-2 transition-all transform active:scale-95 cursor-pointer text-sm sm:text-base shrink-0">
-                        <span>⚡ চেকআউট ও পেমেন্ট</span>
-                        <span class="font-mono font-black text-sm hidden lg:inline" id="cart-btn-grand-total">৳{{ cart.grand_total|default:cart.total_payable|default:'0.00' }}</span>
-                        <span class="text-xs bg-emerald-800/50 px-2 py-0.5 rounded-lg font-mono">⏎ Enter</span>
+                        class="py-2.5 px-5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-extrabold rounded-2xl shadow-md shadow-emerald-600/25 flex items-center space-x-1.5 transition-all transform active:scale-95 cursor-pointer text-sm shrink-0"
+                        title="পেমেন্ট কাউন্টারে প্রবেশ করুন">
+                        <span>⚡ পেমেন্ট</span>
+                        <span class="hidden" id="cart-btn-grand-total">৳{{ cart.grand_total|default:cart.total_payable|default:'0.00' }}</span>
                     </button>
 
                     <!-- Grand Total Net Amount (Large Font) -->
@@ -401,7 +443,7 @@
                     </div>
                 </div>
 
-                <!-- Right: Discount Form, Financials Breakdown, Cart Actions & Customer Info -->
+                <!-- Right: Discount Form, Cart Clear & Customer Info -->
                 <div class="flex flex-wrap items-center justify-between sm:justify-end gap-2.5 sm:gap-3 w-full xl:w-auto">
                     
                     <!-- Inline Discount Form (F4) -->
@@ -446,23 +488,12 @@
                         </div>
                     </form>
 
-                    <!-- Subtotal, Discount & VAT Breakdown -->
-                    <div class="hidden lg:flex items-center space-x-3 text-xs shrink-0">
-                        <div class="text-right">
-                            <span class="text-[10px] text-slate-400 font-bold uppercase block leading-none mb-0.5">সাব-টোটাল</span>
-                            <span class="font-mono text-slate-700 font-bold text-xs sm:text-sm" id="cart-subtotal">৳{{ cart.subtotal|default:cart.subtotal_mrp|default:'0.00' }}</span>
-                        </div>
-                        <div class="text-right">
-                            <span class="text-[10px] text-slate-400 font-bold uppercase block leading-none mb-0.5">ছাড়</span>
-                            <span class="font-mono text-rose-600 font-bold text-xs sm:text-sm" id="cart-discount">-৳{{ cart.total_discount|default:cart.discount_amount|default:'0.00' }}</span>
-                        </div>
-                        <div class="text-right">
-                            <span class="text-[10px] text-slate-400 font-bold uppercase block leading-none mb-0.5">ভ্যাট</span>
-                            <span class="font-mono text-slate-700 font-bold text-xs sm:text-sm" id="cart-vat">৳{{ cart.vat_amount|default:'0.00' }}</span>
-                        </div>
-                    </div>
+                    <!-- Hidden elements for HTMX OOB updates -->
+                    <span class="hidden" id="cart-subtotal">৳{{ cart.subtotal|default:cart.subtotal_mrp|default:'0.00' }}</span>
+                    <span class="hidden" id="cart-discount">-৳{{ cart.total_discount|default:cart.discount_amount|default:'0.00' }}</span>
+                    <span class="hidden" id="cart-vat">৳{{ cart.vat_amount|default:'0.00' }}</span>
 
-                    <!-- Cart Hold & Clear Buttons -->
+                    <!-- Cart Clear Button -->
                     <div class="flex items-center space-x-1.5 shrink-0">
                         <button 
                             type="button" 
@@ -473,29 +504,7 @@
                             class="px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold transition-all active:scale-95 flex items-center space-x-1"
                             title="কার্ট খালি করুন [F8]">
                             <span>🗑️</span>
-                            <span class="hidden sm:inline">খালি [F8]</span>
-                        </button>
-                        
-                        <button 
-                            type="button" 
-                            hx-post="{% url 'pos:hold_cart' %}" 
-                            hx-target="#cart-container"
-                            hx-swap="outerHTML"
-                            class="px-2.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-bold transition-all active:scale-95 flex items-center space-x-1"
-                            title="বর্তমান কার্টটি স্থগিত রাখুন ও পরবর্তী কাস্টমারের বিল করুন">
-                            <span>⏸️</span>
-                            <span class="hidden sm:inline">হোল্ড</span>
-                        </button>
-
-                        <button 
-                            type="button" 
-                            hx-get="{% url 'pos:held_carts' %}" 
-                            hx-target="#held-carts-modal-content"
-                            onclick="document.getElementById('held-carts-modal').classList.remove('hidden')"
-                            class="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-xs font-bold transition-all active:scale-95 flex items-center space-x-1"
-                            title="স্থগিত রাখা কার্টগুলো দেখুন ও রিস্টোর করুন">
-                            <span>📂</span>
-                            <span class="hidden sm:inline">সংরক্ষিত</span>
+                            <span>খালি [F8]</span>
                         </button>
                     </div>
 
@@ -1013,6 +1022,9 @@
             <!-- HTMX injects held carts partial here -->
         </div>
     </div>
+
+    <!-- Stock Inward Modal -->
+    {% include "inventory/partials/stock_in_modal.html" %}
 
 </div>
 
@@ -1622,7 +1634,51 @@ function posTerminal() {
     }
 }
 
+function playCartAddSound() {
+    try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        if (!window._posAudioCtx) {
+            window._posAudioCtx = new AudioContext();
+        }
+        const ctx = window._posAudioCtx;
+        if (ctx.state === 'suspended') {
+            ctx.resume();
+        }
+        
+        const now = ctx.currentTime;
+        
+        // Tone 1: Crisp pleasant beep (880 Hz - A5)
+        const osc1 = ctx.createOscillator();
+        const gain1 = ctx.createGain();
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(880, now);
+        gain1.gain.setValueAtTime(0.18, now);
+        gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+        osc1.connect(gain1);
+        gain1.connect(ctx.destination);
+        osc1.start(now);
+        osc1.stop(now + 0.08);
+
+        // Tone 2: Harmonic POS chime (1320 Hz - E6)
+        const osc2 = ctx.createOscillator();
+        const gain2 = ctx.createGain();
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(1320, now + 0.06);
+        gain2.gain.setValueAtTime(0.20, now + 0.06);
+        gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+        osc2.connect(gain2);
+        gain2.connect(ctx.destination);
+        osc2.start(now + 0.06);
+        osc2.stop(now + 0.22);
+    } catch (e) {
+        // Audio silently handled
+    }
+}
+window.playCartAddSound = playCartAddSound;
+
 function addDrugBatch(batchId) {
+    playCartAddSound();
     htmx.ajax('POST', "{% url 'pos:cart_add' %}", {
         target: '#cart-container',
         swap: 'outerHTML',
