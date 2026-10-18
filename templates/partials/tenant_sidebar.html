@@ -17,12 +17,14 @@
             </div>
         </a>
 
-        <!-- Mobile Drawer Close Toggle (Only on mobile) -->
+        <!-- Drawer / Sidebar Close Toggle (Desktop & Mobile) -->
         <button 
             type="button" 
-            @click="sidebarOpen = false" 
-            class="md:hidden p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white border border-slate-700">
-            &times;
+            @click="typeof toggleSidebar === 'function' ? toggleSidebar() : (sidebarOpen = false)" 
+            class="p-1.5 px-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 border border-slate-700 transition-all text-xs font-bold"
+            title="সাইডবার মেনু লুকান (Hide Sidebar)">
+            <span class="hidden lg:inline">◀</span>
+            <span class="lg:hidden text-sm">&times;</span>
         </button>
     </div>
 

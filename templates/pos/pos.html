@@ -68,7 +68,10 @@
     </div>
 
     <!-- Desktop Sidebar (Large screens & Laptops) -->
-    <div class="hidden lg:block shrink-0 h-screen sticky top-0">
+    <div 
+        x-show="desktopSidebarVisible" 
+        x-cloak
+        class="hidden lg:block shrink-0 h-screen sticky top-0 z-30 transition-all duration-300">
         {% include "partials/tenant_sidebar.html" with active_tab="pos" %}
     </div>
 
@@ -76,90 +79,96 @@
     <div class="flex-1 flex flex-col min-w-0 overflow-hidden pt-14 md:pt-0">
         
         <!-- Top Action Bar (Desktop / Tablet) -->
-        <header class="hidden md:flex h-16 bg-white border-b border-slate-200 px-4 lg:px-6 items-center justify-between shrink-0 shadow-sm z-20">
+        <header class="hidden md:flex h-14 bg-white border-b border-slate-200 px-3 lg:px-5 items-center justify-between shrink-0 shadow-xs z-20">
             
-            <!-- Quick Shortcuts Bar -->
-            <div class="flex items-center space-x-2 text-xs">
-                <!-- Tablet Menu Toggle Button (shown on screens smaller than lg) -->
+            <!-- Quick Shortcuts Bar (Compact & Sleek) -->
+            <div class="flex items-center space-x-1.5 text-xs overflow-x-auto py-1 no-scrollbar">
+                <!-- Sidebar Toggle Button (All screens: Desktop, Tablet, Mobile) -->
                 <button 
                     type="button" 
-                    @click="sidebarOpen = true"
-                    class="lg:hidden px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold flex items-center space-x-1.5 transition-all shadow-sm active:scale-95"
-                    title="মেনু খুলুন">
-                    <span>☰</span>
-                    <span>মেনু</span>
+                    @click="toggleSidebar()"
+                    class="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold flex items-center space-x-1.5 transition-all shadow-xs active:scale-95 whitespace-nowrap cursor-pointer"
+                    :title="desktopSidebarVisible ? 'সাইডবার মেনু লুকান' : 'সাইডবার মেনু দেখান'">
+                    <span class="text-sm">☰</span>
+                    <span class="hidden sm:inline font-bold" x-text="desktopSidebarVisible ? 'মেনু' : 'মেনু দেখান'">মেনু</span>
                 </button>
 
-                <!-- Add New Drug Button -->
+                <!-- Add New Drug Button (Compact) -->
                 <button 
                     type="button" 
                     @click="openAddDrugModal('')"
-                    class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center space-x-1.5 transition-all shadow-sm active:scale-95">
+                    class="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold flex items-center space-x-1 transition-all shadow-xs whitespace-nowrap"
+                    title="নতুন ঔষধ ক্যাটালগে যুক্ত করুন">
                     <span>➕</span>
-                    <span>নতুন ঔষধ যোগ করুন</span>
+                    <span>নতুন ঔষধ</span>
                 </button>
 
-                <!-- Camera Scanner Hotkey -->
+                <!-- Camera Scanner Hotkey (Compact) -->
                 <button 
                     type="button" 
                     @click="openCameraModal()"
-                    class="px-3 py-1.5 rounded-xl bg-cyan-50 hover:bg-cyan-100 text-cyan-700 border border-cyan-200 font-mono font-bold flex items-center space-x-1.5 transition-all shadow-sm active:scale-95">
+                    class="px-2.5 py-1.5 rounded-xl bg-cyan-50 hover:bg-cyan-100 text-cyan-800 border border-cyan-200 font-bold flex items-center space-x-1 transition-all shadow-xs active:scale-95 whitespace-nowrap"
+                    title="ক্যামেরা স্ক্যানার (F6)">
                     <span>📸</span>
-                    <span><kbd class="bg-cyan-200/80 px-1 rounded text-cyan-900">F6</kbd> ক্যামেরা স্ক্যান</span>
+                    <span><kbd class="bg-cyan-200/80 px-1 py-0.5 rounded text-[10px] font-mono text-cyan-900">F6</kbd> স্ক্যান</span>
                 </button>
 
-                <!-- Voice Hotkey Badge -->
+                <!-- Voice Hotkey Badge (Compact) -->
                 <button 
                     type="button" 
                     @click="toggleVoice()"
-                    :class="isListening ? 'bg-rose-500 text-white animate-pulse border-rose-400 shadow-md' : 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'"
-                    class="px-3 py-1.5 rounded-xl border font-mono font-bold flex items-center space-x-1.5 transition-all shadow-sm active:scale-95">
+                    :class="isListening ? 'bg-rose-500 text-white animate-pulse border-rose-400' : 'bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100'"
+                    class="px-2.5 py-1.5 rounded-xl border font-bold flex items-center space-x-1 transition-all shadow-xs active:scale-95 whitespace-nowrap"
+                    title="ভয়েস কমান্ড (F3)">
                     <span>🎙️</span>
-                    <span><kbd :class="isListening ? 'bg-rose-700 text-white' : 'bg-emerald-200/80 text-emerald-900'" class="px-1 rounded">F3</kbd> ভয়েস কমান্ড</span>
-                    <span x-show="isListening" class="w-2 h-2 rounded-full bg-white animate-ping"></span>
+                    <span><kbd :class="isListening ? 'bg-rose-700 text-white' : 'bg-emerald-200/80 text-emerald-900'" class="px-1 py-0.5 rounded text-[10px] font-mono">F3</kbd> ভয়েস</span>
+                    <span x-show="isListening" class="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>
                 </button>
 
-                <!-- AI Multimodal Settings (Gemini) -->
+                <!-- AI Multimodal Settings (Compact) -->
                 <button 
                     type="button" 
                     @click="openAiConfigModal()"
-                    class="px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 font-bold flex items-center space-x-1.5 transition-all shadow-sm active:scale-95"
+                    class="px-2.5 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 font-bold flex items-center space-x-1 transition-all shadow-xs active:scale-95 whitespace-nowrap"
                     title="Google Gemini AI ও মাল্টিমোডাল ইঞ্জিন সেটিংস">
                     <span>🤖</span>
-                    <span>AI সেটিংস</span>
-                    <span x-show="isAiActive" class="w-2 h-2 rounded-full bg-emerald-500 shadow-sm" title="Gemini AI সক্রিয়"></span>
+                    <span>AI</span>
+                    <span x-show="isAiActive" class="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-sm" title="Gemini AI সক্রিয়"></span>
                 </button>
 
-                <!-- Train AI Hotkey -->
+                <!-- Train AI Hotkey (Compact) -->
                 <button 
                     type="button" 
                     @click="openTrainModal('')"
-                    class="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold flex items-center space-x-1.5 transition-all shadow-sm active:scale-95">
+                    class="px-2.5 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 font-bold flex items-center space-x-1 transition-all shadow-xs active:scale-95 whitespace-nowrap"
+                    title="AI কে ঔষধ শেখান (F7)">
                     <span>🎓</span>
-                    <span><kbd class="bg-indigo-200/80 px-1 rounded text-indigo-900">F7</kbd> ঔষধ শেখান</span>
+                    <span><kbd class="bg-indigo-200/80 px-1 py-0.5 rounded text-[10px] font-mono text-indigo-900">F7</kbd> শেখান</span>
                 </button>
 
-                <!-- Recent Invoices Button -->
+                <!-- Recent Invoices Button (Compact) -->
                 <button 
                     type="button" 
                     hx-get="{% url 'pos:recent_invoices' %}"
                     hx-target="#recent-invoices-modal-content"
                     onclick="document.getElementById('recent-invoices-modal').classList.remove('hidden')"
-                    class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-bold flex items-center space-x-1.5 transition-all shadow-sm active:scale-95"
+                    class="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-bold flex items-center space-x-1 transition-all shadow-xs active:scale-95 whitespace-nowrap"
                     title="আজকের তৈরি ইনভয়েসসমূহ দেখুন বা পুনরায় প্রিন্ট করুন">
                     <span>📜</span>
-                    <span>সাম্প্রতিক রসিদ</span>
+                    <span>রসিদ</span>
                 </button>
 
-                <span class="hidden xl:inline-flex px-2 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-600 font-mono">
-                    <kbd class="text-emerald-600 font-bold">F2</kbd> Search
-                </span>
-                <span class="hidden xl:inline-flex px-2 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-600 font-mono">
-                    <kbd class="text-emerald-600 font-bold">F4</kbd> Discount
-                </span>
-                <span class="hidden xl:inline-flex px-2 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-600 font-mono">
-                    <kbd class="text-emerald-600 font-bold">Enter</kbd> Tender
-                </span>
+                <div class="hidden 2xl:flex items-center space-x-1 text-[11px] text-slate-500 font-mono">
+                    <span class="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200">
+                        <kbd class="text-emerald-700 font-bold">F2</kbd> Search
+                    </span>
+                    <span class="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200">
+                        <kbd class="text-emerald-700 font-bold">F4</kbd> Discount
+                    </span>
+                    <span class="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200">
+                        <kbd class="text-emerald-700 font-bold">Enter</kbd> Tender
+                    </span>
+                </div>
             </div>
 
             <!-- Pharmacist & Live Clock -->
@@ -1011,6 +1020,18 @@
 <script>
 function posTerminal() {
     return {
+        desktopSidebarVisible: localStorage.getItem('pharma_pos_sidebar_visible') !== 'false',
+        toggleSidebar() {
+            if (window.innerWidth >= 1024) {
+                this.desktopSidebarVisible = !this.desktopSidebarVisible;
+                try {
+                    localStorage.setItem('pharma_pos_sidebar_visible', this.desktopSidebarVisible);
+                } catch(e) {}
+            } else {
+                this.sidebarOpen = !this.sidebarOpen;
+                this.mobileMenuOpen = !this.mobileMenuOpen;
+            }
+        },
         currentTime: new Date().toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' }),
         searchOpen: false,
         mobileMenuOpen: false,
