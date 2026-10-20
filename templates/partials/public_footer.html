@@ -1,0 +1,26 @@
+<!-- Footer (Unified across Home, Login, Register & all public pages) -->
+<footer class="mt-auto bg-slate-50 border-t border-slate-200 py-10 px-4 text-center text-xs text-slate-500">
+    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div class="flex flex-col sm:flex-row items-center sm:space-x-3 text-center sm:text-left space-y-1 sm:space-y-0">
+            <span class="font-bold text-slate-800">{{ platform_settings.platform_name|default:"PharmaFlow BD" }} SaaS</span>
+            <span class="hidden sm:inline">•</span>
+            <span>স্বত্ব © ২০২৬ সর্বস্বত্ব সংরক্ষিত।</span>
+            {% if platform_settings.support_phone %}
+            <span class="hidden md:inline">•</span>
+            <span class="hidden md:inline text-slate-600 font-semibold">📞 হেল্পলাইন: {{ platform_settings.support_phone }}</span>
+            {% endif %}
+        </div>
+        <div class="flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-slate-600 font-bold">
+            <a href="{% url 'landing' %}" class="hover:text-emerald-600 transition-colors">হোম</a>
+            <a href="{% url 'landing' %}#features" class="hover:text-emerald-600 transition-colors">ফিচারসমূহ</a>
+            <a href="{% url 'ledger:dashboard' %}" class="hover:text-emerald-600 transition-colors">আয়-ব্যয় লেজার</a>
+            <a href="{% url 'landing' %}#pricing" class="hover:text-emerald-600 transition-colors">মূল্য তালিকা</a>
+            {% if request.user.is_authenticated %}
+            <a href="{% url 'pos:screen' %}" class="hover:text-emerald-600 transition-colors text-emerald-700">POS Terminal</a>
+            {% else %}
+            <a href="{% url 'login' %}" class="hover:text-emerald-600 transition-colors">লগইন</a>
+            <a href="{% url 'register' %}" class="hover:text-emerald-600 transition-colors text-emerald-600">ফ্রি ট্রায়াল</a>
+            {% endif %}
+        </div>
+    </div>
+</footer>

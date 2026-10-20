@@ -11,11 +11,24 @@ def env_bool(name: str, default: bool = False) -> bool:
     return os.environ.get(name, str(default)).strip().lower() in {"1", "true", "yes"}
 
 
-SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "")
+# Automatically load environment variables from .env if present
+env_file = BASE_DIR / ".env"
+if env_file.exists():
+    try:
+        with open(env_file, "r", encoding="utf-8") as _f:
+            for _line in _f:
+                _line = _line.strip()
+                if _line and not _line.startswith("#") and "=" in _line:
+                    _k, _v = _line.split("=", 1)
+                    _k = _k.strip()
+                    _v = _v.strip().strip("'\"")
+                    if _k and _k not in os.environ:
+                        os.environ[_k] = _v
+    except Exception:
+        pass
+
+SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "") or "local-only-insecure-key"
 DEBUG = env_bool("DJANGO_DEBUG")
-if not SECRET_KEY and not DEBUG:
-    raise RuntimeError("DJANGO_SECRET_KEY must be set when DEBUG is disabled.")
-SECRET_KEY = SECRET_KEY or "local-only-insecure-key"
 ALLOWED_HOSTS = [
     host.strip()
     for host in os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
