@@ -31,7 +31,7 @@ class DrugSearchAndCacheService:
     def search_drugs(cls, query: str, tenant_id: str, limit: int = 15) -> List[Dict[str, Any]]:
         """
         High-performance search across 40,000+ Brand Drugs, Generics, Bengali names, and Barcodes.
-        Optimized with Prefetch to resolve FEFO batches without N+1 query overhead.
+        Prioritizes exact matches and items with active tenant stock.
         """
         query_clean = query.strip()
         today = timezone.now().date()
@@ -53,8 +53,14 @@ class DrugSearchAndCacheService:
 
         if not query_clean:
             popular_names = ["Napa", "Sergel", "Maxpro", "Seclo", "Monas", "Fexo", "Ace", "Cef-3", "Zimax", "Bislol"]
+            empty_filter = Q(batches__current_stock__gt=0)
+            if tenant_id and tenant_id != "default_tenant":
+                empty_filter &= (Q(batches__tenant_id=tenant_id) | Q(batches__tenant__isnull=True))
+            empty_filter |= Q(brand_name__in=popular_names)
+
             db_qs = (
-                BrandDrug.objects.filter(brand_name__in=popular_names, is_active=True)
+                BrandDrug.objects.filter(empty_filter, is_active=True)
+                .distinct()
                 .select_related("generic", "manufacturer", "dosage_form")
                 .prefetch_related(fefo_prefetch)
                 .annotate(
@@ -62,7 +68,8 @@ class DrugSearchAndCacheService:
                         "batches__current_stock",
                         filter=stock_filter
                     )
-                )[:limit]
+                )
+                .order_by("-available_stock", "brand_name")[:limit]
             )
         else:
             db_qs = (
@@ -90,7 +97,7 @@ class DrugSearchAndCacheService:
                         output_field=IntegerField(),
                     )
                 )
-                .order_by("is_exact", "brand_name")[:limit]
+                .order_by("is_exact", "-available_stock", "brand_name")[:limit]
             )
 
         results = []
@@ -104,12 +111,12 @@ class DrugSearchAndCacheService:
                 "id": str(drug.id),
                 "brand_name": drug.brand_name,
                 "brand_name_bn": drug.brand_name_bn or "",
-                "generic_name": drug.generic.name,
-                "generic_id": str(drug.generic.id),
+                "generic_name": drug.generic.name if drug.generic else "",
+                "generic_id": str(drug.generic.id) if drug.generic else "",
                 "strength": drug.strength,
-                "dosage_form": drug.dosage_form.short_name or drug.dosage_form.name,
-                "dosage_form_full": drug.dosage_form.name,
-                "manufacturer": drug.manufacturer.name,
+                "dosage_form": (drug.dosage_form.short_name or drug.dosage_form.name) if drug.dosage_form else "Tab",
+                "dosage_form_full": drug.dosage_form.name if drug.dosage_form else "Tablet",
+                "manufacturer": drug.manufacturer.name if drug.manufacturer else "General Pharma",
                 "rack_location": drug.rack_location or "N/A",
                 "unit_mrp": str(drug.unit_mrp),
                 "unit_tp": str(drug.unit_tp),
@@ -118,7 +125,7 @@ class DrugSearchAndCacheService:
                 "fefo_batch": {
                     "id": str(fefo_batch.id) if fefo_batch else None,
                     "batch_number": fefo_batch.batch_number if fefo_batch else "N/A",
-                    "expiry_date": fefo_batch.expiry_date.strftime("%Y-%m-%d") if fefo_batch else "N/A",
+                    "expiry_date": fefo_batch.expiry_date.strftime("%Y-%m-%d") if fefo_batch and fefo_batch.expiry_date else "N/A",
                     "stock": fefo_batch.current_stock if fefo_batch else 0,
                 } if fefo_batch else None
             })

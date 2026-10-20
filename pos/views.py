@@ -7,7 +7,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 
-from django.db.models import Q, Sum, Count, Prefetch
+from django.db.models import Q, Sum, Count, Prefetch, Case, When, Value, IntegerField
 
 from inventory.models import BrandDrug, DrugBatch
 from inventory.services import DrugSearchAndCacheService
@@ -19,12 +19,19 @@ from notifications.sms_services import BangladeshSMSGateway
 from core.decorators import tenant_user_required
 
 
-def get_popular_pos_drugs(tenant_key: str, limit: int = 35):
+def get_popular_pos_drugs(tenant_key: str, limit: int = 60):
     """
-    Retrieves top-selling, high-demand essential drugs with FEFO batch stock
-    for the POS quick-add side panel. Fully optimized with prefetch to eliminate N+1 queries.
+    Retrieves all tenant inventory-stocked medicines first, supplemented by top-selling/popular 
+    essential drugs with FEFO batch stock for the POS quick-add side panel.
+    Fully optimized to eliminate N+1 queries.
     """
     today = timezone.now().date()
+    
+    # 1. Tenant-aware batch filter
+    batch_filter = Q(current_stock__gt=0)
+    if tenant_key and tenant_key != "default_tenant":
+        batch_filter &= (Q(tenant_id=tenant_key) | Q(tenant__isnull=True))
+
     popular_names = [
         "Napa Extra", "Napa", "Sergel 20", "Ace Plus", "Ace", "Maxpro 20",
         "Seclo 20", "Losectil 20", "Fexo 120", "Monas 10", "SMC ORSaline-N",
@@ -43,7 +50,7 @@ def get_popular_pos_drugs(tenant_key: str, limit: int = 35):
             .values("drug__brand_name")
             .annotate(sale_count=Count("id"))
             .order_by("-sale_count")
-            .values_list("drug__brand_name", flat=True)[:10]
+            .values_list("drug__brand_name", flat=True)[:15]
         )
         for name in top_sales:
             if name and name not in popular_names:
@@ -51,48 +58,26 @@ def get_popular_pos_drugs(tenant_key: str, limit: int = 35):
     except Exception:
         pass
 
-    stock_filter = Q(batches__current_stock__gt=0, batches__expiry_date__gt=today)
-    if tenant_key and tenant_key != "default_tenant":
-        stock_filter &= (Q(batches__tenant_id=tenant_key) | Q(batches__tenant__isnull=True))
-
-    batch_filter = Q(current_stock__gt=0)
-    if tenant_key and tenant_key != "default_tenant":
-        batch_filter &= (Q(tenant_id=tenant_key) | Q(tenant__isnull=True))
-
-    fefo_prefetch = Prefetch(
-        "batches",
-        queryset=DrugBatch.objects.filter(batch_filter).order_by("expiry_date"),
-        to_attr="prefetched_fefo_batches"
-    )
-
-    qs = (
-        BrandDrug.objects.filter(brand_name__in=popular_names, is_active=True)
-        .select_related("generic", "manufacturer", "dosage_form")
-        .prefetch_related(fefo_prefetch)
-        .annotate(available_stock=Sum("batches__current_stock", filter=stock_filter))
-    )
-
     results = []
     seen = set()
-    for drug in qs:
+
+    # Step 1: Fetch tenant's active batches directly!
+    # This guarantees every item in "ইনভেন্টরি ও ব্যাচ স্টক (FEFO)" appears on POS screen.
+    tenant_batches = (
+        DrugBatch.objects.filter(batch_filter)
+        .select_related("drug", "drug__generic", "drug__dosage_form", "drug__manufacturer")
+        .order_by("expiry_date")
+    )
+    for batch in tenant_batches[:200]:
+        drug = batch.drug
+        if not drug or not drug.is_active:
+            continue
         key = f"{drug.brand_name}_{drug.strength}"
         if key in seen:
             continue
         seen.add(key)
 
-        batches = getattr(drug, "prefetched_fefo_batches", [])
-        if not batches:
-            continue
-
-        # In-memory FEFO resolution (zero additional DB queries)
-        fefo_batch = next((b for b in batches if b.expiry_date and b.expiry_date > today), None)
-        if not fefo_batch and batches:
-            fefo_batch = batches[0]
-
-        if not fefo_batch:
-            continue
-
-        g_name = (drug.generic.name or "").lower()
+        g_name = (drug.generic.name or "").lower() if drug.generic else ""
         b_name = (drug.brand_name or "").lower()
 
         if any(w in g_name for w in ['prazole', 'domperidone', 'antacid']) or any(w in b_name for w in ['sergel', 'seclo', 'maxpro', 'losectil', 'nexum', 'pantonix', 'omidon', 'motigut']):
@@ -112,15 +97,75 @@ def get_popular_pos_drugs(tenant_key: str, limit: int = 35):
             "id": str(drug.id),
             "brand_name": drug.brand_name,
             "strength": drug.strength,
-            "generic_name": drug.generic.name,
-            "dosage_form": drug.dosage_form.short_name or drug.dosage_form.name,
-            "unit_mrp": str(drug.unit_mrp),
-            "stock": fefo_batch.current_stock if fefo_batch else (drug.available_stock or 0),
-            "batch_id": str(fefo_batch.id) if fefo_batch else "",
+            "generic_name": drug.generic.name if drug.generic else "",
+            "dosage_form": (drug.dosage_form.short_name or drug.dosage_form.name) if drug.dosage_form else "Tab",
+            "unit_mrp": str(batch.unit_mrp or drug.unit_mrp),
+            "stock": batch.current_stock,
+            "batch_id": str(batch.id),
             "category": cat,
+            "is_tenant_stock": True,
         })
         if len(results) >= limit:
             break
+
+    # Step 2: If pharmacy has fewer items than limit, supplement with popular essential drugs that have batches
+    if len(results) < limit:
+        fefo_prefetch = Prefetch(
+            "batches",
+            queryset=DrugBatch.objects.filter(batch_filter).order_by("expiry_date"),
+            to_attr="prefetched_fefo_batches"
+        )
+        popular_qs = (
+            BrandDrug.objects.filter(brand_name__in=popular_names, is_active=True)
+            .select_related("generic", "manufacturer", "dosage_form")
+            .prefetch_related(fefo_prefetch)
+        )
+        for drug in popular_qs:
+            key = f"{drug.brand_name}_{drug.strength}"
+            if key in seen:
+                continue
+            seen.add(key)
+
+            batches = getattr(drug, "prefetched_fefo_batches", [])
+            if not batches:
+                continue
+
+            fefo_batch = next((b for b in batches if b.expiry_date and b.expiry_date > today), None)
+            if not fefo_batch and batches:
+                fefo_batch = batches[0]
+            if not fefo_batch:
+                continue
+
+            g_name = (drug.generic.name or "").lower() if drug.generic else ""
+            b_name = (drug.brand_name or "").lower()
+
+            if any(w in g_name for w in ['prazole', 'domperidone', 'antacid']) or any(w in b_name for w in ['sergel', 'seclo', 'maxpro', 'losectil', 'nexum', 'pantonix', 'omidon', 'motigut']):
+                cat = 'gastric'
+            elif any(w in g_name for w in ['paracetamol', 'aceclofenac', 'ibuprofen']) or any(w in b_name for w in ['napa', 'ace', 'flexi', 'fast']):
+                cat = 'fever'
+            elif any(w in g_name for w in ['fexofenadine', 'montelukast', 'cetirizine', 'levocetirizine', 'cough']) or any(w in b_name for w in ['fexo', 'monas', 'alatrol', 'histacin', 'montene', 'tofen']):
+                cat = 'allergy'
+            elif any(w in g_name for w in ['vitamin', 'calcium', 'salts', 'mineral']) or any(w in b_name for w in ['saline', 'calbo', 'neuro', 'coralcal', 'filwel']):
+                cat = 'saline'
+            elif any(w in g_name for w in ['cefixime', 'azithromycin', 'ciprofloxacin']) or any(w in b_name for w in ['cef-3', 'zimax']):
+                cat = 'antibiotic'
+            else:
+                cat = 'other'
+
+            results.append({
+                "id": str(drug.id),
+                "brand_name": drug.brand_name,
+                "strength": drug.strength,
+                "generic_name": drug.generic.name if drug.generic else "",
+                "dosage_form": (drug.dosage_form.short_name or drug.dosage_form.name) if drug.dosage_form else "Tab",
+                "unit_mrp": str(fefo_batch.unit_mrp or drug.unit_mrp),
+                "stock": fefo_batch.current_stock,
+                "batch_id": str(fefo_batch.id),
+                "category": cat,
+                "is_tenant_stock": False,
+            })
+            if len(results) >= limit:
+                break
 
     return results
 
@@ -148,7 +193,7 @@ def pos_screen_view(request):
     
     # Pre-prime top drugs in background/cache if empty
     DrugSearchAndCacheService.prime_top_drugs_cache(tenant_id=tenant_key, limit=100)
-    popular_drugs = get_popular_pos_drugs(tenant_key=tenant_key, limit=35)
+    popular_drugs = get_popular_pos_drugs(tenant_key=tenant_key, limit=100)
     
     context = {
         "cart": cart,
