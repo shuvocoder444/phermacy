@@ -3,8 +3,13 @@
     {% for drug in results %}
     <div 
         tabindex="0"
+        {% if drug.fefo_batch %}
         @click="addDrugBatch('{{ drug.fefo_batch.id }}'); searchOpen = false;"
         @keydown.enter.prevent="addDrugBatch('{{ drug.fefo_batch.id }}'); searchOpen = false;"
+        {% else %}
+        @click="alert('{{ drug.brand_name|escapejs }} এর কোনো স্টক নেই। স্টক ইন করুন।'); $dispatch('open-stock-in'); searchOpen = false;"
+        @keydown.enter.prevent="alert('{{ drug.brand_name|escapejs }} এর কোনো স্টক নেই। স্টক ইন করুন।'); $dispatch('open-stock-in'); searchOpen = false;"
+        {% endif %}
         class="search-result-item flex items-center justify-between p-3 rounded-2xl cursor-pointer transition-all border border-transparent hover:border-emerald-300 hover:bg-emerald-50/50 focus:bg-emerald-50 focus:border-emerald-500 focus:outline-none group">
         
         <!-- Drug Details -->
