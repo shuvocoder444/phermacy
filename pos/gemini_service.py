@@ -23,8 +23,9 @@ logger = logging.getLogger(__name__)
 AI_CONFIG_PATH = os.path.join(settings.BASE_DIR, "media", "ai_config.json")
 CACHE_KEY_AI_CONFIG = "pos:ai_system_config"
 GEMINI_MODELS = [
-    "gemini-1.5-flash",
     "gemini-2.0-flash",
+    "gemini-2.0-flash-lite",
+    "gemini-1.5-flash",
     "gemini-1.5-flash-8b",
 ]
 
