@@ -19,7 +19,7 @@
         <!-- Mobile Drawer Close Toggle (Only on mobile) -->
         <button 
             type="button" 
-            @click="sidebarOpen = false" 
+            @click="window.matchMedia('(min-width: 1024px)').matches ? window.toggleDashboardSidebar() : (sidebarOpen = false)" 
             class="md:hidden p-2 rounded-xl bg-slate-900 text-slate-400 hover:text-white border border-slate-800">
             &times;
         </button>

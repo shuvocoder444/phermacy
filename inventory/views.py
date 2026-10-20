@@ -79,7 +79,9 @@ def stock_dashboard(request):
         batch_qs = batch_qs.filter(current_stock=0)
 
     # Ordering FEFO
-    batches = batch_qs.order_by("expiry_date", "drug__brand_name")
+    batches = batch_qs.annotate(
+        stock_value=F("current_stock") * F("unit_mrp")
+    ).order_by("expiry_date")
 
     paginator = Paginator(batches, 50)
     page_number = request.GET.get("page")
@@ -101,7 +103,9 @@ def stock_dashboard(request):
         "tenant": tenant,
     }
 
-    if request.headers.get("HX-Request"):
+    # Boosted link navigation also sends HX-Request, but needs the full page
+    # so the sidebar and dashboard layout remain present after navigation.
+    if request.headers.get("HX-Request") and not request.headers.get("HX-Boosted"):
         return render(request, "inventory/partials/stock_table.html", context)
 
     return render(request, "inventory/stock_dashboard.html", context)
@@ -115,6 +119,7 @@ def add_batch_view(request):
     Supports both traditional POST redirect and high-speed JSON/HTMX response.
     """
     tenant = getattr(request, "tenant", None)
+    catalog_scope = Q(tenant__isnull=True) | Q(tenant=tenant)
     
     brand_name = request.POST.get("brand_name", "").strip()
     batch_number = request.POST.get("batch_number", "").strip()
@@ -143,12 +148,12 @@ def add_batch_view(request):
         drug = None
         if drug_id:
             try:
-                drug = BrandDrug.objects.filter(id=drug_id, is_active=True).first()
+                drug = BrandDrug.objects.filter(catalog_scope, id=drug_id, is_active=True).first()
             except Exception:
                 pass
         
         if not drug:
-            drug = BrandDrug.objects.filter(brand_name__iexact=brand_name, is_active=True).first()
+            drug = BrandDrug.objects.filter(catalog_scope, brand_name__iexact=brand_name, is_active=True).first()
 
         if not drug:
             # Create a quick brand product in catalog if not found
@@ -164,6 +169,7 @@ def add_batch_view(request):
                 dosage_form=dosage,
                 manufacturer=mfg,
                 generic=generic,
+                tenant=tenant,
                 strength="Standard", 
                 unit_mrp=unit_mrp,
                 unit_tp=unit_tp,
@@ -230,15 +236,18 @@ def drug_autocomplete_view(request):
     High-speed JSON autocomplete endpoint for medicine catalog search during Stock In.
     """
     query = request.GET.get("q", "").strip()
+    tenant = getattr(request, "tenant", None)
+    catalog_scope = Q(tenant__isnull=True) | Q(tenant=tenant)
     if not query:
         drugs = (
-            BrandDrug.objects.filter(is_active=True)
+            BrandDrug.objects.filter(catalog_scope, is_active=True)
             .select_related("generic", "manufacturer", "dosage_form")
             .order_by("brand_name")[:12]
         )
     else:
         drugs = (
             BrandDrug.objects.filter(
+                catalog_scope,
                 Q(brand_name__icontains=query) |
                 Q(generic__name__icontains=query) |
                 Q(manufacturer__name__icontains=query),

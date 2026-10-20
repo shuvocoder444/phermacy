@@ -18,7 +18,7 @@
         <!-- Drawer / Sidebar Close Toggle (Desktop & Mobile) -->
         <button 
             type="button" 
-            @click="typeof toggleSidebar === 'function' ? toggleSidebar() : (sidebarOpen = false)" 
+            @click="window.matchMedia('(min-width: 1024px)').matches ? window.toggleDashboardSidebar() : (sidebarOpen = false)" 
             class="p-1.5 px-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 border border-slate-700 transition-all text-xs font-bold"
             title="সাইডবার মেনু লুকান (Hide Sidebar)">
             <span class="hidden lg:inline">◀</span>
@@ -26,65 +26,48 @@
         </button>
     </div>
 
-    <!-- Pharmacy Subscription & Status Pill -->
-    <div class="px-5 py-3 bg-slate-950/60 border-b border-slate-800 flex items-center justify-between text-xs shrink-0">
-        <div class="flex items-center space-x-2">
-            <span class="w-2 h-2 rounded-full {% if tenant.is_active or request.tenant.is_active %}bg-emerald-500 animate-pulse{% else %}bg-rose-500{% endif %}"></span>
-            <span class="text-[11px] font-bold text-slate-300">
-                {% if tenant.is_active or request.tenant.is_active %}সক্রিয় ফার্মেসি{% else %}স্থগিত (Suspended){% endif %}
-            </span>
-        </div>
-        <span class="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-            {% if tenant.subscription %}{{ tenant.subscription.plan.tier|upper }}{% elif request.tenant.subscription %}{{ request.tenant.subscription.plan.tier|upper }}{% else %}PRO{% endif %}
-        </span>
-    </div>
-
-    <!-- Quick Action: POS Terminal Launch -->
-    <div class="p-4 border-b border-slate-800 shrink-0">
-        <a href="{% url 'pos:screen' %}" 
-           class="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white text-xs font-black shadow-lg shadow-emerald-600/25 transition-all flex items-center justify-center space-x-2 active:scale-95">
-            <span>⚡</span>
-            <span>লাইভ POS কাউন্টার (F1)</span>
-        </a>
-    </div>
-
     <!-- Main Navigation Menu -->
-    <nav class="flex-1 p-4 space-y-1.5 overflow-y-auto text-xs font-bold">
+    <nav class="tenant-sidebar-nav flex-1 p-4 space-y-1.5 overflow-y-auto text-xs font-bold">
         <div class="text-[10px] uppercase font-black tracking-wider text-slate-500 px-3 py-1">
             ফার্মেসি অপারেশনস
         </div>
 
         <!-- 1. Dashboard Overview -->
-        <a href="{% url 'tenant_dashboard:dashboard' %}" 
-           class="flex items-center space-x-3 px-3.5 py-3 rounded-2xl transition-all {% if active_tab == 'dashboard' %}bg-emerald-600 text-white shadow-lg shadow-emerald-600/30 font-black{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
+        <a href="{% url 'tenant_dashboard:dashboard' %}" {% if active_tab == 'dashboard' %}aria-current="page"{% endif %}
+           class="flex items-center space-x-3 px-3.5 py-3 rounded-2xl transition-all text-slate-300 hover:bg-slate-800 hover:text-white">
             <span class="text-base">📊</span>
             <span>ড্যাশবোর্ড ওভারভিউ</span>
         </a>
 
         <!-- 2. POS Terminal -->
-        <a href="{% url 'pos:screen' %}" 
-           class="flex items-center space-x-3 px-3.5 py-3 rounded-2xl transition-all {% if active_tab == 'pos' %}bg-emerald-600 text-white shadow-lg shadow-emerald-600/30 font-black{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
+        <a href="{% url 'pos:screen' %}" {% if active_tab == 'pos' %}aria-current="page"{% endif %}
+           class="flex items-center space-x-3 px-3.5 py-3 rounded-2xl transition-all text-slate-300 hover:bg-slate-800 hover:text-white">
             <span class="text-base">⚡</span>
             <span>পিওএস সেলস স্ক্রিন</span>
         </a>
 
+        <a href="{% url 'tenant_dashboard:sales' %}" {% if active_tab == 'sales' %}aria-current="page"{% endif %} class="flex items-center space-x-3 px-3.5 py-3 rounded-2xl transition-all text-slate-300 hover:bg-slate-800 hover:text-white">
+            <span class="text-base">🧾</span>
+            <span>সাম্প্রতিক বিক্রয়</span>
+        </a>
+
         <!-- 3. Inventory & Stock -->
-        <a href="{% url 'inventory:dashboard' %}" 
-           class="flex items-center space-x-3 px-3.5 py-3 rounded-2xl transition-all {% if active_tab == 'inventory' %}bg-emerald-600 text-white shadow-lg shadow-emerald-600/30 font-black{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
+        <a href="{% url 'inventory:dashboard' %}" {% if active_tab == 'inventory' %}aria-current="page"{% endif %}
+           class="flex items-center space-x-3 px-3.5 py-3 rounded-2xl transition-all text-slate-300 hover:bg-slate-800 hover:text-white">
             <span class="text-base">📦</span>
             <span>ইনভেন্টরি ও স্টক (FEFO)</span>
         </a>
 
         <!-- 4. Customers & Due Ledger -->
-        <a href="{% url 'customers:dashboard' %}" 
-           class="flex items-center space-x-3 px-3.5 py-3 rounded-2xl transition-all {% if active_tab == 'customers' %}bg-emerald-600 text-white shadow-lg shadow-emerald-600/30 font-black{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
+        <a href="{% url 'customers:dashboard' %}" {% if active_tab == 'customers' %}aria-current="page"{% endif %}
+           class="flex items-center space-x-3 px-3.5 py-3 rounded-2xl transition-all text-slate-300 hover:bg-slate-800 hover:text-white">
             <span class="text-base">👥</span>
             <span>কাস্টমার ও বাকি খাতা</span>
         </a>
 
         <!-- 5. Income & Expense Ledger -->
-        <a href="{% url 'ledger:dashboard' %}" 
-           class="flex items-center space-x-3 px-3.5 py-3 rounded-2xl transition-all {% if active_tab == 'ledger' %}bg-emerald-600 text-white shadow-lg shadow-emerald-600/30 font-black{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
+        <a href="{% url 'ledger:dashboard' %}" {% if active_tab == 'ledger' %}aria-current="page"{% endif %}
+           class="flex items-center space-x-3 px-3.5 py-3 rounded-2xl transition-all text-slate-300 hover:bg-slate-800 hover:text-white">
             <span class="text-base">📒</span>
             <span>আয়-ব্যয় হিসাব লেজার</span>
         </a>
@@ -94,13 +77,13 @@
         </div>
 
         <!-- 6. Subscription & Billing -->
-        <a href="{% url 'tenant_dashboard:subscription' %}" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-2xl {% if active_tab == 'subscription' %}bg-indigo-950/40 text-indigo-300 border border-indigo-500/20{% else %}text-slate-300 border border-transparent hover:bg-indigo-950/40 hover:text-indigo-300 hover:border-indigo-500/20{% endif %} transition-all text-left">
+        <a href="{% url 'tenant_dashboard:subscription' %}" {% if active_tab == 'subscription' %}aria-current="page"{% endif %} class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-2xl text-slate-300 border border-transparent hover:bg-slate-800 hover:text-white transition-all text-left">
             <span class="text-base">💎</span>
             <span>সাবস্ক্রিপশন প্ল্যান</span>
         </a>
 
         <!-- 7. Pharmacy Settings -->
-        <a href="{% url 'tenant_dashboard:settings' %}" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-2xl {% if active_tab == 'settings' %}bg-slate-800 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %} transition-all text-left">
+        <a href="{% url 'tenant_dashboard:settings' %}" {% if active_tab == 'settings' %}aria-current="page"{% endif %} class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-2xl text-slate-300 border border-transparent hover:bg-slate-800 hover:text-white transition-all text-left">
             <span class="text-base">⚙️</span>
             <span>ফার্মেসি প্রোফাইল ও সেটিংস</span>
         </a>

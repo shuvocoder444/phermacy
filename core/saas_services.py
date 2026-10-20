@@ -1,5 +1,5 @@
 from decimal import Decimal
-from datetime import timedelta
+from datetime import datetime, time, timedelta
 from django.utils import timezone
 from django.db.models import Sum, Count, Q
 from django.contrib.auth.models import User
@@ -16,11 +16,10 @@ def ensure_default_subscription_plans() -> list[SubscriptionPlan]:
     """
     plans_config = [
         {
-            "name": "Starter (একক কাউন্টার)",
+            "name": "Starter (Single Pharmacy)",
             "tier": "starter",
             "monthly_price_bdt": Decimal("999.00"),
             "yearly_price_bdt": Decimal("9990.00"),
-            "max_branches": 1,
             "max_users": 2,
             "sms_bundle_included": 200,
             "features": {
@@ -34,11 +33,10 @@ def ensure_default_subscription_plans() -> list[SubscriptionPlan]:
             },
         },
         {
-            "name": "Pro (স্মার্ট পিওএস ও এআই ভিশন)",
+            "name": "Pro (Pharmacy & SMS)",
             "tier": "pro",
             "monthly_price_bdt": Decimal("1999.00"),
             "yearly_price_bdt": Decimal("19990.00"),
-            "max_branches": 3,
             "max_users": 6,
             "sms_bundle_included": 600,
             "features": {
@@ -53,32 +51,36 @@ def ensure_default_subscription_plans() -> list[SubscriptionPlan]:
             },
         },
         {
-            "name": "Enterprise (মাল্টি-ব্রাঞ্চ চেইন)",
+            "name": "Enterprise (Advanced Pharmacy)",
             "tier": "enterprise",
             "monthly_price_bdt": Decimal("4999.00"),
             "yearly_price_bdt": Decimal("49990.00"),
-            "max_branches": 10,
             "max_users": 25,
             "sms_bundle_included": 2500,
             "features": {
                 "all_features": True,
                 "custom_domain": True,
                 "dedicated_manager": True,
-                "central_warehouse": True,
+                "advanced_reports": True,
             },
         },
     ]
 
+    plans_by_tier = {
+        plan.tier: plan
+        for plan in SubscriptionPlan.objects.filter(
+            tier__in=[config["tier"] for config in plans_config]
+        )
+    }
     created_or_found = []
     for p in plans_config:
-        plan = SubscriptionPlan.objects.filter(tier=p["tier"]).first()
-        if not plan:
+        plan = plans_by_tier.get(p["tier"])
+        if plan is None:
             plan = SubscriptionPlan.objects.create(
                 tier=p["tier"],
                 name=p["name"],
                 monthly_price_bdt=p["monthly_price_bdt"],
                 yearly_price_bdt=p["yearly_price_bdt"],
-                max_branches=p["max_branches"],
                 max_users=p["max_users"],
                 sms_bundle_included=p["sms_bundle_included"],
                 features=p["features"],
@@ -171,18 +173,30 @@ def get_tenant_metrics(tenant: Tenant) -> dict:
     start_of_month = today.replace(day=1)
 
     # 1. Sales & Revenue (single consolidated query)
-    today_invoices_qs = Invoice.objects.filter(created_at__date=today)
-    month_invoices_qs = Invoice.objects.filter(created_at__date__gte=start_of_month)
+    valid_sale_statuses = ["COMPLETED", "PARTIAL"]
+    current_tz = timezone.get_current_timezone()
+    month_start = timezone.make_aware(datetime.combine(start_of_month, time.min), current_tz)
+    today_start = timezone.make_aware(datetime.combine(today, time.min), current_tz)
+    tomorrow_start = timezone.make_aware(datetime.combine(today + timedelta(days=1), time.min), current_tz)
+    month_invoices_qs = Invoice.objects.filter(
+        created_at__gte=month_start,
+        created_at__lt=tomorrow_start,
+        status__in=valid_sale_statuses,
+    )
     if tenant:
-        today_invoices_qs = today_invoices_qs.filter(tenant=tenant)
         month_invoices_qs = month_invoices_qs.filter(tenant=tenant)
 
-    today_agg = today_invoices_qs.aggregate(
-        count=Count("id"),
-        total_sales=Sum("total_payable", filter=Q(status="COMPLETED")),
-        cash_sales=Sum("paid_amount", filter=Q(payment_method="CASH", status="COMPLETED")),
-        mfs_sales=Sum("paid_amount", filter=Q(payment_method__in=["BKASH", "NAGAD", "ROCKET"], status="COMPLETED")),
-        due_sales=Sum("due_amount", filter=Q(status="COMPLETED")),
+    # One indexed date-range scan supplies both today's and this month's cards.
+    # Filtering on created_at directly also lets the database use its index,
+    # unlike created_at__date which wraps the column in a function.
+    period_agg = month_invoices_qs.aggregate(
+        month_count=Count("id"),
+        month_sales=Sum("total_payable"),
+        today_count=Count("id", filter=Q(created_at__gte=today_start)),
+        today_sales=Sum("total_payable", filter=Q(created_at__gte=today_start)),
+        cash_sales=Sum("paid_amount", filter=Q(created_at__gte=today_start, payment_method="CASH")),
+        mfs_sales=Sum("paid_amount", filter=Q(created_at__gte=today_start, payment_method__in=["BKASH", "NAGAD", "ROCKET", "CARD", "SPLIT"])),
+        due_sales=Sum("due_amount", filter=Q(created_at__gte=today_start)),
     )
     def _quantize_money(val):
         if val is None:
@@ -192,18 +206,13 @@ def get_tenant_metrics(tenant: Tenant) -> dict:
         except Exception:
             return Decimal("0.00")
 
-    today_sales = _quantize_money(today_agg["total_sales"])
-    today_invoices_count = today_agg["count"] or 0
-    today_cash_sales = _quantize_money(today_agg["cash_sales"])
-    today_mfs_sales = _quantize_money(today_agg["mfs_sales"])
-    today_due_sales = _quantize_money(today_agg["due_sales"])
-
-    month_agg = month_invoices_qs.aggregate(
-        count=Count("id"),
-        total_sales=Sum("total_payable", filter=Q(status="COMPLETED")),
-    )
-    month_sales = _quantize_money(month_agg["total_sales"])
-    month_invoices_count = month_agg["count"] or 0
+    today_sales = _quantize_money(period_agg["today_sales"])
+    today_invoices_count = period_agg["today_count"] or 0
+    today_cash_sales = _quantize_money(period_agg["cash_sales"])
+    today_mfs_sales = _quantize_money(period_agg["mfs_sales"])
+    today_due_sales = _quantize_money(period_agg["due_sales"])
+    month_sales = _quantize_money(period_agg["month_sales"])
+    month_invoices_count = period_agg["month_count"] or 0
 
     # 2. Customer Receivables / Dues
     cust_qs = Customer.objects.filter(is_active=True)
@@ -219,6 +228,7 @@ def get_tenant_metrics(tenant: Tenant) -> dict:
     # 3. Monthly Operational Expenses
     exp_qs = IncomeExpenseEntry.objects.filter(
         entry_date__gte=start_of_month,
+        entry_date__lte=today,
         entry_type="EXPENSE"
     )
     if tenant:
@@ -226,18 +236,32 @@ def get_tenant_metrics(tenant: Tenant) -> dict:
     month_expenses = _quantize_money(exp_qs.aggregate(s=Sum("amount"))["s"])
 
     # Estimated Gross Profit (Sales - Expenses)
-    estimated_profit = _quantize_money(max(Decimal("0.00"), month_sales - month_expenses))
+    estimated_profit = _quantize_money(month_sales - month_expenses)
 
     # 4. Inventory Alerts (Direct tenant batch query instead of full catalog table scan)
-    low_stock_limit = tenant.low_stock_threshold or 15 if tenant else 15
-    batch_qs = DrugBatch.objects.filter(current_stock__gt=0)
+    low_stock_limit = tenant.low_stock_threshold if tenant else 15
+    if low_stock_limit is None:
+        low_stock_limit = 15
+    active_drugs = BrandDrug.objects.filter(is_active=True)
     if tenant:
-        batch_qs = batch_qs.filter(tenant=tenant)
-
-    low_stock_count = batch_qs.filter(current_stock__lte=low_stock_limit).count()
-    low_stock_batches = list(batch_qs.filter(current_stock__lte=low_stock_limit).select_related("drug")[:10])
-    low_stock_drugs = [b.drug for b in low_stock_batches]
-    out_of_stock_count = 0
+        active_drugs = active_drugs.filter(tenant=tenant)
+    sellable_batch_filter = Q(batches__expiry_date__gt=today, batches__current_stock__gt=0)
+    if tenant:
+        sellable_batch_filter &= Q(batches__tenant=tenant)
+    drugs_with_sellable_stock = active_drugs.annotate(
+        dashboard_stock=Sum(
+            "batches__current_stock",
+            filter=sellable_batch_filter,
+            default=0,
+        )
+    )
+    low_stock_drugs_qs = drugs_with_sellable_stock.filter(
+        dashboard_stock__gt=0,
+        dashboard_stock__lte=low_stock_limit,
+    ).select_related("dosage_form").order_by("dashboard_stock", "brand_name")
+    low_stock_count = low_stock_drugs_qs.count()
+    low_stock_drugs = list(low_stock_drugs_qs[:10])
+    out_of_stock_count = drugs_with_sellable_stock.filter(dashboard_stock=0).count()
 
     # Expiring batches within 60 days
     sixty_days_future = today + timedelta(days=60)

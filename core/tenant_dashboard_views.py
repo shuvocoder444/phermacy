@@ -4,12 +4,13 @@ from django.http import HttpResponse, JsonResponse
 from django.views.decorators.http import require_GET, require_POST
 from django.contrib import messages
 from django.utils import timezone
+from django.core.paginator import Paginator
+from django.db.models import Q
 
 from core.models import Tenant, SubscriptionPlan, TenantSubscription
 from core.decorators import tenant_user_required
 from core.saas_services import (
     ensure_tenant_subscription,
-    ensure_default_subscription_plans,
     get_tenant_metrics,
 )
 
@@ -32,7 +33,6 @@ def tenant_dashboard_view(request):
         messages.error(request, "কোনো ফার্মেসি প্রোফাইল পাওয়া যায়নি।")
         return redirect("login")
 
-    ensure_default_subscription_plans()
     subscription = ensure_tenant_subscription(tenant)
     metrics = get_tenant_metrics(tenant)
     now_date = timezone.now().date()
@@ -54,6 +54,39 @@ def tenant_dashboard_view(request):
         "recent_invoices": recent_invoices,
     }
     return render(request, "tenant/dashboard.html", context)
+
+
+@tenant_user_required
+def recent_pos_sales_view(request):
+    """Show the tenant's complete POS invoice history, newest first."""
+    tenant = getattr(request, "tenant", None)
+    if not tenant and hasattr(request.user, "staff_profile") and request.user.staff_profile:
+        tenant = request.user.staff_profile.tenant
+    if not tenant and request.user.is_superuser:
+        tenant = Tenant.objects.first()
+    if not tenant:
+        messages.error(request, "ফার্মেসি প্রোফাইল পাওয়া যায়নি।")
+        return redirect("login")
+
+    from pos.models import Invoice
+    query = request.GET.get("q", "").strip()
+    invoices = Invoice.objects.filter(tenant=tenant).select_related("customer", "cashier").order_by("-created_at")
+    if query:
+        invoices = invoices.filter(
+            Q(invoice_number__icontains=query)
+            | Q(customer__name__icontains=query)
+            | Q(customer__phone__icontains=query)
+            | Q(customer_name_walkin__icontains=query)
+            | Q(customer_phone_walkin__icontains=query)
+        )
+
+    page_obj = Paginator(invoices, 50).get_page(request.GET.get("page"))
+    return render(request, "tenant/recent_pos_sales.html", {
+        "tenant": tenant,
+        "invoices": page_obj.object_list,
+        "page_obj": page_obj,
+        "query": query,
+    })
 
 
 @tenant_user_required
@@ -80,7 +113,6 @@ def tenant_subscription_page(request):
         messages.error(request, "ফার্মেসি প্রোফাইল পাওয়া যায়নি।")
         return redirect("login")
 
-    ensure_default_subscription_plans()
     subscription = ensure_tenant_subscription(tenant)
     now_date = timezone.now().date()
     context = {

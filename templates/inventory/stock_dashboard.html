@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load humanize %}
 
 {% block title %}ইনভেন্টরি ও স্টক ম্যানেজমেন্ট | {{ tenant.name }}{% endblock %}
 
@@ -58,7 +59,7 @@
     </div>
 
     <!-- Desktop Sidebar -->
-    <div class="hidden lg:block shrink-0 h-screen">
+    <div class="dashboard-sidebar-wrapper hidden lg:block shrink-0 h-screen">
         {% include "partials/tenant_sidebar.html" with active_tab="inventory" %}
     </div>
 
@@ -109,21 +110,21 @@
             <!-- Total Units -->
             <div class="p-4 sm:p-5 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-1">
                 <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">মোট স্টক ইউনিট</span>
-                <div class="text-xl sm:text-2xl font-black text-slate-800">{{ total_units }} <span class="text-xs font-normal text-slate-500">পিস</span></div>
+                <div class="text-xl sm:text-2xl font-black text-slate-800">{{ total_units|intcomma }} <span class="text-xs font-normal text-slate-500">পিস</span></div>
                 <div class="text-[11px] font-semibold text-emerald-600">সক্রিয় ব্যাচ: {{ total_batches }} টি</div>
             </div>
 
             <!-- Stock Valuation at TP -->
             <div class="p-4 sm:p-5 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-1">
                 <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">মোট ক্রয়মূল্য (TP)</span>
-                <div class="text-xl sm:text-2xl font-black text-slate-800">৳{{ total_tp_value|floatformat:2 }}</div>
+                <div class="text-base sm:text-lg font-black tracking-tight text-slate-800 whitespace-nowrap">৳{{ total_tp_value|floatformat:2|intcomma }}</div>
                 <div class="text-[11px] font-semibold text-slate-500">ইনভেন্টরি ক্যাপিটাল</div>
             </div>
 
             <!-- Stock Valuation at MRP -->
             <div class="p-4 sm:p-5 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-1">
                 <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">মোট বিক্রয়মূল্য (MRP)</span>
-                <div class="text-xl sm:text-2xl font-black text-indigo-700">৳{{ total_mrp_value|floatformat:2 }}</div>
+                <div class="text-base sm:text-lg font-black tracking-tight text-indigo-700 whitespace-nowrap">৳{{ total_mrp_value|floatformat:2|intcomma }}</div>
                 <div class="text-[11px] font-semibold text-indigo-600">সম্ভাব্য মোট রেভিনিউ</div>
             </div>
 

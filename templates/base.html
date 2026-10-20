@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="bn" class="h-full bg-slate-50 text-slate-800">
 <head>
+    {% load static %}
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -12,25 +13,15 @@
     <meta name="theme-color" content="#ffffff">
     <title>{% block title %}PharmaFlow SaaS - Bangladesh Retail Pharmacy POS{% endblock %}</title>
 
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Bengali:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link rel="stylesheet" href="{% static 'css/fonts.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app.css' %}">
+    <script src="{% static 'js/htmx-1.9.10.min.js' %}"></script>
+    <script defer src="{% static 'js/alpine-3.13.3.min.js' %}"></script>
 
     <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Inter', 'Noto Sans Bengali', 'sans-serif'],
-                    }
-                }
-            }
-        }
+        document.addEventListener('htmx:configRequest', (event) => {
+            event.detail.headers['X-CSRFToken'] = '{{ csrf_token }}';
+        });
     </script>
 
     <style>
@@ -53,6 +44,21 @@
         .htmx-indicator { display: none; }
         .htmx-request .htmx-indicator { display: inline-block; }
         .htmx-request.htmx-indicator { display: inline-block; }
+        .page-loading-bar { transform: scaleX(0); }
+        .htmx-request .page-loading-bar { animation: page-loading 1.1s ease-in-out infinite alternate; }
+        @keyframes page-loading { from { transform: scaleX(.08); } to { transform: scaleX(.82); } }
+        @media (min-width: 1024px) {
+            body.dashboard-sidebar-collapsed .dashboard-sidebar-wrapper { display: none !important; }
+        }
+        .tenant-sidebar-nav { overflow-anchor: none; scroll-behavior: smooth; }
+        .tenant-sidebar-nav a[aria-current="page"] {
+            background: #059669;
+            color: #fff;
+            border-color: transparent;
+            box-shadow: 0 10px 15px -3px rgb(5 150 105 / 30%);
+            font-weight: 900;
+        }
+        #dashboard-sidebar-reopen { display: none !important; }
         @media (max-width: 767px) {
             .pos-mobile-bottom-bar { padding-bottom: calc(.75rem + env(safe-area-inset-bottom)); }
             input, select, textarea { font-size: 16px !important; }
@@ -62,14 +68,9 @@
         }
     </style>
 </head>
-<body class="h-full flex flex-col antialiased">
-
-    <!-- HTMX CSRF Token Config -->
-    <script>
-        document.body.addEventListener('htmx:configRequest', (event) => {
-            event.detail.headers['X-CSRFToken'] = '{{ csrf_token }}';
-        });
-    </script>
+<body class="h-full flex flex-col antialiased" hx-boost="true">
+    <div class="page-loading-bar fixed inset-x-0 top-0 z-[100] h-1 bg-emerald-500 origin-left scale-x-0 transition-transform duration-200 htmx-indicator" aria-hidden="true"></div>
+    <button id="dashboard-sidebar-reopen" type="button" onclick="window.toggleDashboardSidebar()" class="fixed left-0 top-1/2 z-[80] -translate-y-1/2 items-center justify-center rounded-r-xl bg-slate-900 px-3 py-4 text-white shadow-xl hover:bg-emerald-700" style="display:none" aria-label="সাইডবার দেখান" title="সাইডবার দেখান">☰</button>
 
     <!-- Navbar block if needed -->
     {% block navbar %}{% endblock %}
@@ -81,7 +82,88 @@
     {% block extra_scripts %}{% endblock %}
 
     <script>
-    // Native mobile pull-to-refresh is enabled via standard browser behavior
+    (() => {
+        const hasSidebar = () => Boolean(document.querySelector('.dashboard-sidebar-wrapper'));
+        const keepActiveSidebarItemVisible = () => {
+            document.querySelectorAll('.tenant-sidebar-nav').forEach(nav => {
+                const active = nav.querySelector('a[aria-current="page"]');
+                if (!active || nav.clientHeight === 0) return;
+                const navRect = nav.getBoundingClientRect();
+                const itemRect = active.getBoundingClientRect();
+                if (itemRect.bottom > navRect.bottom) {
+                    nav.scrollTo({ top: nav.scrollTop + itemRect.bottom - navRect.bottom + 8, behavior: 'smooth' });
+                } else if (itemRect.top < navRect.top) {
+                    nav.scrollTo({ top: nav.scrollTop - navRect.top + itemRect.top - 8, behavior: 'smooth' });
+                }
+            });
+        };
+        const syncSidebar = () => {
+            const isCollapsed = hasSidebar() && document.body.classList.contains('dashboard-sidebar-collapsed');
+            if (!hasSidebar()) document.body.classList.remove('dashboard-sidebar-collapsed');
+            let reopen = document.getElementById('dashboard-sidebar-reopen');
+            if (hasSidebar() && !reopen) {
+                reopen = document.createElement('button');
+                reopen.id = 'dashboard-sidebar-reopen';
+                reopen.type = 'button';
+                reopen.textContent = '☰';
+                reopen.setAttribute('aria-label', 'Show sidebar');
+                reopen.title = 'Show sidebar';
+                reopen.addEventListener('click', () => window.toggleDashboardSidebar());
+            }
+            const header = [...document.querySelectorAll('header')].find(item =>
+                getComputedStyle(item).display !== 'none' && !item.closest('.dashboard-sidebar-wrapper')
+            );
+            if (hasSidebar() && header && reopen && !header.contains(reopen)) {
+                const first = header.firstElementChild;
+                const group = document.createElement('div');
+                group.className = 'flex min-w-0 items-center gap-3';
+                header.insertBefore(group, first);
+                group.appendChild(reopen);
+                if (first) group.appendChild(first);
+                reopen.className = 'shrink-0 h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors';
+            }
+            if (reopen) reopen.style.setProperty('display', isCollapsed && header ? 'inline-flex' : 'none', 'important');
+            keepActiveSidebarItemVisible();
+            window.dispatchEvent(new CustomEvent('dashboard-sidebar-state', { detail: { collapsed: isCollapsed } }));
+        };
+        window.toggleDashboardSidebar = () => {
+            if (!hasSidebar()) return;
+            const collapsed = !document.body.classList.contains('dashboard-sidebar-collapsed');
+            document.body.classList.toggle('dashboard-sidebar-collapsed', collapsed);
+            syncSidebar();
+            window.dispatchEvent(new CustomEvent('dashboard-sidebar-state', { detail: { collapsed } }));
+        };
+        window.loadPosPopularDrugs = () => {
+            const cards = document.getElementById('popular-drug-cards');
+            if (!cards || !window.htmx || cards.dataset.loading === 'true') return;
+            let favorites = [];
+            try { favorites = JSON.parse(localStorage.getItem('pharma_pos_fav_drugs') || '[]'); } catch (e) {}
+            const url = new URL(cards.dataset.url, window.location.origin);
+            favorites.slice(0, 30).forEach(name => url.searchParams.append('favorite', name));
+            cards.dataset.loading = 'true';
+            htmx.ajax('GET', url.toString(), { target: cards, swap: 'innerHTML' });
+        };
+
+        if (!window.dashboardSidebarEventsInstalled) {
+            document.addEventListener('htmx:beforeSwap', event => {
+                if (event.detail.target === document.body) {
+                    document.body.classList.remove('dashboard-sidebar-collapsed');
+                }
+            });
+            document.addEventListener('htmx:afterSettle', event => {
+                syncSidebar();
+                if (event.detail.target === document.body) {
+                    window.dispatchEvent(new CustomEvent('close-stock-in'));
+                    window.loadPosPopularDrugs?.();
+                    document.querySelectorAll('main, .overflow-y-auto:not(.tenant-sidebar-nav)').forEach(scroller => {
+                        if (scroller.scrollHeight > scroller.clientHeight) scroller.scrollTop = 0;
+                    });
+                }
+            });
+            window.dashboardSidebarEventsInstalled = true;
+        }
+        syncSidebar();
+    })();
     </script>
 </body>
 </html>

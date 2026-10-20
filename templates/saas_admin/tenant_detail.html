@@ -3,10 +3,19 @@
 {% block title %}{{ tenant.name }} | Tenant Details | SaaS Admin{% endblock %}
 
 {% block content %}
-<div class="min-h-screen bg-slate-900 text-slate-100 flex flex-col font-sans">
+<div x-data="{ sidebarOpen: false }" class="h-screen bg-slate-900 text-slate-100 flex flex-col lg:flex-row overflow-hidden font-sans">
+    <div x-show="sidebarOpen" x-cloak @click="sidebarOpen = false" class="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm lg:hidden"></div>
+    <div x-show="sidebarOpen" x-cloak class="fixed inset-y-0 left-0 z-50 w-72 lg:hidden">
+        {% include "partials/saas_admin_sidebar.html" with active_tab="dashboard" %}
+    </div>
+    <div class="dashboard-sidebar-wrapper hidden lg:block shrink-0 h-screen">
+        {% include "partials/saas_admin_sidebar.html" with active_tab="dashboard" %}
+    </div>
+    <div class="flex-1 min-w-0 min-h-0 overflow-y-auto">
     <!-- Header -->
     <header class="bg-slate-950/80 backdrop-blur-md border-b border-slate-800 sticky top-0 z-40 px-3 sm:px-8 py-3.5 flex flex-wrap items-center justify-between gap-2">
         <div class="flex items-center space-x-3">
+            <button type="button" @click="sidebarOpen = true" class="lg:hidden p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold" aria-label="মেনু খুলুন">☰</button>
             <a href="{% url 'saas_admin:dashboard' %}" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs">
                 ← ফিরে যান
             </a>
@@ -156,6 +165,7 @@
             </div>
         </div>
     </main>
+    </div>
 </div>
 {% endblock %}
 

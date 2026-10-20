@@ -35,11 +35,16 @@ class DrugSearchAndCacheService:
         """
         query_clean = query.strip()
         today = timezone.now().date()
+        catalog_filter = Q(tenant__isnull=True)
+        if tenant_id and tenant_id != "default_tenant":
+            catalog_filter |= Q(tenant_id=tenant_id)
 
         # Tenant-aware batch filter
         batch_filter = Q(current_stock__gt=0)
         if tenant_id and tenant_id != "default_tenant":
-            batch_filter &= (Q(tenant_id=tenant_id) | Q(tenant__isnull=True))
+            batch_filter &= Q(tenant_id=tenant_id)
+        else:
+            batch_filter &= Q(pk__in=[])
 
         fefo_prefetch = Prefetch(
             "batches",
@@ -49,17 +54,21 @@ class DrugSearchAndCacheService:
 
         stock_filter = Q(batches__current_stock__gt=0, batches__expiry_date__gt=today)
         if tenant_id and tenant_id != "default_tenant":
-            stock_filter &= (Q(batches__tenant_id=tenant_id) | Q(batches__tenant__isnull=True))
+            stock_filter &= Q(batches__tenant_id=tenant_id)
+        else:
+            stock_filter &= Q(batches__pk__in=[])
 
         if not query_clean:
             popular_names = ["Napa", "Sergel", "Maxpro", "Seclo", "Monas", "Fexo", "Ace", "Cef-3", "Zimax", "Bislol"]
             empty_filter = Q(batches__current_stock__gt=0)
             if tenant_id and tenant_id != "default_tenant":
-                empty_filter &= (Q(batches__tenant_id=tenant_id) | Q(batches__tenant__isnull=True))
+                empty_filter &= Q(batches__tenant_id=tenant_id)
+            else:
+                empty_filter &= Q(batches__pk__in=[])
             empty_filter |= Q(brand_name__in=popular_names)
 
             db_qs = (
-                BrandDrug.objects.filter(empty_filter, is_active=True)
+                BrandDrug.objects.filter(catalog_filter, empty_filter, is_active=True)
                 .distinct()
                 .select_related("generic", "manufacturer", "dosage_form")
                 .prefetch_related(fefo_prefetch)
@@ -74,6 +83,7 @@ class DrugSearchAndCacheService:
         else:
             db_qs = (
                 BrandDrug.objects.filter(
+                    catalog_filter,
                     Q(brand_name__icontains=query_clean)
                     | Q(generic__name__icontains=query_clean)
                     | Q(brand_name_bn__icontains=query_clean)

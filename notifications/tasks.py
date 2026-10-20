@@ -13,6 +13,18 @@ from .sms_services import BangladeshSMSGateway
 logger = logging.getLogger(__name__)
 
 
+@shared_task(name="notifications.tasks.send_pos_invoice_sms")
+def send_pos_invoice_sms(customer_phone: str, invoice_number: str, total_payable: str, due_amount: str, pharmacy_name: str):
+    """Send receipt SMS out of the checkout request so payment returns promptly."""
+    BangladeshSMSGateway.send_invoice_sms(
+        customer_phone=customer_phone,
+        invoice_number=invoice_number,
+        total_payable=total_payable,
+        due_amount=due_amount,
+        pharmacy_name=pharmacy_name,
+    )
+
+
 @shared_task(name="notifications.tasks.check_expiring_batches_nightly")
 def check_expiring_batches_nightly():
     """

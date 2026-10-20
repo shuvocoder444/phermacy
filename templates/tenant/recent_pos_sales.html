@@ -1,0 +1,74 @@
+﻿{% extends "base.html" %}
+
+{% block title %}সাম্প্রতিক বিক্রয় ট্রানজেকশন | {{ tenant.name }}{% endblock %}
+
+{% block content %}
+<style>
+    html, body { height: 100% !important; overflow: hidden !important; background: #f1f5f9 !important; }
+</style>
+<div x-data="{ sidebarOpen: false }" class="h-screen w-full bg-slate-100 flex flex-col lg:flex-row overflow-hidden font-sans">
+    <div class="lg:hidden bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shrink-0">
+        <button type="button" @click="sidebarOpen = !sidebarOpen" class="p-2 rounded-xl bg-slate-100 text-slate-700">☰</button>
+        <span class="text-sm font-black text-slate-900">{{ tenant.name }}</span>
+        <a href="{% url 'pos:screen' %}" class="px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-bold">+ POS</a>
+    </div>
+    <div x-show="sidebarOpen" x-cloak @click="sidebarOpen = false" class="fixed inset-0 z-40 bg-black/60 lg:hidden"></div>
+    <div x-show="sidebarOpen" x-cloak class="fixed inset-y-0 left-0 z-50 w-72 lg:hidden">{% include "partials/tenant_sidebar.html" with active_tab="sales" %}</div>
+    <div class="dashboard-sidebar-wrapper hidden lg:block shrink-0">{% include "partials/tenant_sidebar.html" with active_tab="sales" %}</div>
+
+    <main class="flex-1 min-w-0 overflow-y-auto">
+        <div class="max-w-7xl mx-auto space-y-5 px-4 sm:px-6 lg:px-8 pb-8">
+            <header class="sticky top-0 z-20 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3 bg-white/95 backdrop-blur border-b border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                    <h1 class="text-xl sm:text-2xl font-black text-slate-900">সাম্প্রতিক বিক্রয় ট্রানজেকশন</h1>
+                    <p class="mt-1 text-sm text-slate-500">POS-এ তৈরি সব বিক্রয় রেকর্ড, নতুন থেকে পুরোনো ক্রমে</p>
+                </div>
+                <a href="{% url 'pos:screen' %}" class="inline-flex justify-center px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm">+ নতুন বিক্রয় করুন</a>
+            </header>
+
+            <form method="get" class="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm flex flex-col sm:flex-row gap-3">
+                <input type="search" name="q" value="{{ query }}" placeholder="ইনভয়েস নম্বর, কাস্টমারের নাম বা ফোন দিয়ে খুঁজুন" class="flex-1 min-w-0 px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                <button class="px-5 py-2.5 rounded-xl bg-slate-900 text-white font-bold text-sm">খুঁজুন</button>
+                {% if query %}<a href="{% url 'tenant_dashboard:sales' %}" class="px-4 py-2.5 rounded-xl bg-slate-100 text-slate-700 text-center font-bold text-sm">সব দেখুন</a>{% endif %}
+            </form>
+
+            <section class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs min-w-[850px]">
+                        <thead class="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold">
+                            <tr><th class="py-3 px-4">ইনভয়েস নং</th><th class="py-3 px-4">কাস্টমার</th><th class="py-3 px-4">পেমেন্ট</th><th class="py-3 px-4 text-right">মোট টাকা</th><th class="py-3 px-4 text-right">পরিশোধিত</th><th class="py-3 px-4 text-right">বাকি</th><th class="py-3 px-4">তারিখ ও সময়</th><th class="py-3 px-4">স্ট্যাটাস</th><th class="py-3 px-4">ক্যাশিয়ার</th><th class="py-3 px-4 text-right">রসিদ</th></tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 text-slate-700">
+                            {% for inv in invoices %}
+                            <tr class="hover:bg-slate-50">
+                                <td class="py-3 px-4 font-mono font-bold text-slate-900">{{ inv.invoice_number }}</td>
+                                <td class="py-3 px-4"><div class="font-semibold">{{ inv.customer.name|default:inv.customer_name_walkin }}</div><div class="text-[10px] text-slate-400">{{ inv.customer.phone|default:inv.customer_phone_walkin|default:"" }}</div></td>
+                                <td class="py-3 px-4">{{ inv.get_payment_method_display }}</td>
+                                <td class="py-3 px-4 text-right font-black font-mono text-emerald-700">৳{{ inv.total_payable|floatformat:2 }}</td>
+                                <td class="py-3 px-4 text-right font-mono">৳{{ inv.paid_amount|floatformat:2 }}</td>
+                                <td class="py-3 px-4 text-right font-mono {% if inv.due_amount > 0 %}text-rose-600 font-bold{% endif %}">৳{{ inv.due_amount|floatformat:2 }}</td>
+                                <td class="py-3 px-4 whitespace-nowrap text-slate-500">{{ inv.created_at|date:"d M Y, h:i A" }}</td>
+                                <td class="py-3 px-4">{{ inv.get_status_display }}</td>
+                                <td class="py-3 px-4">{{ inv.cashier.get_full_name|default:inv.cashier.username }}</td>
+                                <td class="py-3 px-4 text-right"><a href="{% url 'pos:print_receipt' inv.id %}" target="_blank" class="inline-block px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold">প্রিন্ট</a></td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="10" class="text-center py-12 text-slate-400">কোনো বিক্রয় ট্রানজেকশন পাওয়া যায়নি।</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% if page_obj.paginator.num_pages > 1 %}
+                <div class="p-4 border-t border-slate-100 flex items-center justify-between gap-3 text-xs">
+                    <span class="text-slate-500">মোট {{ page_obj.paginator.count }}টি · পৃষ্ঠা {{ page_obj.number }}/{{ page_obj.paginator.num_pages }}</span>
+                    <div class="flex gap-2">
+                        {% if page_obj.has_previous %}<a href="?q={{ query|urlencode }}&page={{ page_obj.previous_page_number }}" class="px-3 py-2 rounded-lg bg-slate-100 text-slate-700 font-bold">আগের</a>{% endif %}
+                        {% if page_obj.has_next %}<a href="?q={{ query|urlencode }}&page={{ page_obj.next_page_number }}" class="px-3 py-2 rounded-lg bg-slate-100 text-slate-700 font-bold">পরের</a>{% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            </section>
+        </div>
+    </main>
+</div>
+{% endblock %}

@@ -69,7 +69,7 @@
     <div
         x-show="desktopSidebarVisible"
         x-cloak
-        class="hidden lg:block shrink-0 h-screen sticky top-0 z-30 transition-all duration-300">
+        class="dashboard-sidebar-wrapper hidden lg:block shrink-0 h-screen sticky top-0 z-30 transition-all duration-300">
         {% include "partials/tenant_sidebar.html" with active_tab="pos" %}
     </div>
 
@@ -109,16 +109,6 @@
 
             <!-- Quick Shortcuts Bar (Compact & Sleek) -->
             <div class="flex items-center space-x-1.5 text-xs overflow-x-auto py-1 no-scrollbar">
-                <!-- Sidebar Toggle Button (All screens: Desktop, Tablet, Mobile) -->
-                <button
-                    type="button"
-                    @click="toggleSidebar()"
-                    class="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold flex items-center space-x-1.5 transition-all shadow-xs active:scale-95 whitespace-nowrap cursor-pointer"
-                    :title="desktopSidebarVisible ? 'সাইডবার মেনু লুকান' : 'সাইডবার মেনু দেখান'">
-                    <span class="text-sm">☰</span>
-                    <span class="hidden sm:inline font-bold" x-text="desktopSidebarVisible ? 'মেনু' : 'মেনু দেখান'">মেনু</span>
-                </button>
-
                 <!-- Stock Inward Button (Compact) -->
                 <button
                     type="button"
@@ -276,9 +266,7 @@
                             <span class="text-sm">📦</span>
                             <h3 class="font-black text-xs uppercase tracking-wider text-slate-800">ইনভেন্টরি স্টক ও জনপ্রিয় ঔষধ</h3>
                         </div>
-                        <span class="text-[11px] font-bold text-slate-400 font-mono">
-                            {{ popular_drugs|length }}টি আইটেম
-                        </span>
+                        <span class="text-[11px] font-bold text-slate-400 font-mono">দ্রুত বিক্রির ওষুধ</span>
                     </div>
 
                     <!-- Instant Live Catalog Search (F2) -->
@@ -376,74 +364,9 @@
 
                 <!-- Scrollable Products Grid -->
                 <div class="flex-1 overflow-y-auto p-2.5 space-y-2">
-                    {% if popular_drugs %}
-                    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-2 lg:grid-cols-4 gap-1.5 sm:gap-2">
-                        {% for drug in popular_drugs %}
-                        <div
-                            x-show="matchesCategory('{{ drug.category }}', '{{ drug.brand_name|escapejs }}') && matchesSearch('{{ drug.brand_name|escapejs }}', '{{ drug.generic_name|escapejs }}')"
-                            x-transition
-                            @click="addDrugBatch('{{ drug.batch_id }}')"
-                            class="group relative bg-white border border-slate-200 hover:border-emerald-500 rounded-xl p-2 shadow-sm hover:shadow-md transition-all active:scale-[0.97] cursor-pointer flex flex-col justify-between select-none">
-
-                            <!-- Card Top: Dosage pill + Star button -->
-                            <div class="flex items-center justify-between mb-1">
-                                <span class="text-[9px] px-1 py-0.5 rounded font-mono font-bold uppercase {% if drug.dosage_form == 'Tab' %}bg-emerald-100 text-emerald-800 border border-emerald-200{% elif drug.dosage_form == 'Cap' %}bg-purple-100 text-purple-800 border border-purple-200{% elif drug.dosage_form == 'Syr' %}bg-amber-100 text-amber-800 border border-amber-200{% else %}bg-slate-100 text-slate-700 border border-slate-200{% endif %}">
-                                    {{ drug.dosage_form }}
-                                </span>
-
-                                <!-- Favorite toggle button -->
-                                <button
-                                    type="button"
-                                    @click.stop="toggleFavorite('{{ drug.brand_name|escapejs }}')"
-                                    class="p-0.5 rounded-lg transition-colors"
-                                    title="ফেভারিটে যোগ/বাদ দিন">
-                                    <svg class="w-3.5 h-3.5 transition-transform group-hover:scale-110" :class="isFavorite('{{ drug.brand_name|escapejs }}') ? 'text-amber-400 fill-amber-400' : 'text-slate-300 hover:text-amber-400 fill-transparent'" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
-                                    </svg>
-                                </button>
-                            </div>
-
-                            <!-- Card Middle: Brand & Strength -->
-                            <div class="space-y-0.5 mb-1.5">
-                                <h4 class="font-extrabold text-[11px] text-slate-800 group-hover:text-emerald-700 transition-colors leading-tight line-clamp-1" title="{{ drug.brand_name }}">
-                                    {{ drug.brand_name }}
-                                </h4>
-                                <div class="text-[9px] text-slate-500 font-semibold font-mono truncate">{{ drug.strength }}</div>
-                            </div>
-
-                            <!-- Card Bottom: Price & Stock & Instant Add Badge -->
-                            <div class="pt-1 border-t border-slate-100 flex items-center justify-between">
-                                <div>
-                                    <span class="text-[11px] font-black text-emerald-600 font-mono">৳{{ drug.unit_mrp }}</span>
-                                </div>
-                                <div class="flex items-center space-x-1">
-                                    <span class="text-[8px] px-1 py-0.5 rounded font-mono font-bold {% if drug.stock > 50 %}bg-slate-100 text-slate-600{% else %}bg-amber-100 text-amber-800{% endif %}">
-                                        স্টক {{ drug.stock }}
-                                    </span>
-                                    <span class="w-4 h-4 rounded-md bg-emerald-50 text-emerald-700 group-hover:bg-emerald-600 group-hover:text-white flex items-center justify-center text-[10px] font-black transition-colors shadow-sm">
-                                        +
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                        {% endfor %}
+                    <div id="popular-drug-cards" data-url="{% url 'pos:popular_drugs' %}">
+                        <div class="p-6 text-center text-slate-400"><p class="text-xs">Loading medicines...</p></div>
                     </div>
-
-                    <!-- Empty state when Favorites is active but empty -->
-                    <div x-show="activeCategory === 'fav' && favorites.length === 0" class="p-6 text-center text-slate-400 space-y-2">
-                        <div class="w-12 h-12 rounded-full bg-amber-50 text-amber-500 mx-auto flex items-center justify-center text-xl">
-                            ⭐
-                        </div>
-                        <div class="text-xs font-bold text-slate-700">কোনো ফেভারিট ঔষধ যুক্ত নেই</div>
-                        <p class="text-[11px] text-slate-400 max-w-xs mx-auto">
-                            যেকোনো ঔষধের পাশে থাকা ⭐ আইকনে ক্লিক করুন, তাহলে দ্রুত বিক্রির জন্য এখানে সংরক্ষিত থাকবে।
-                        </p>
-                    </div>
-                    {% else %}
-                    <div class="p-6 text-center text-slate-400">
-                        <p class="text-xs">ঔষধ লোড হচ্ছে...</p>
-                    </div>
-                    {% endif %}
                 </div>
             </aside>
         </div>
@@ -1073,17 +996,11 @@
 <script>
 function posTerminal() {
     return {
-        desktopSidebarVisible: localStorage.getItem('pharma_pos_sidebar_visible') !== 'false',
-        toggleSidebar() {
-            if (window.innerWidth >= 1024) {
-                this.desktopSidebarVisible = !this.desktopSidebarVisible;
-                try {
-                    localStorage.setItem('pharma_pos_sidebar_visible', this.desktopSidebarVisible);
-                } catch(e) {}
-            } else {
-                this.sidebarOpen = !this.sidebarOpen;
-                this.mobileMenuOpen = !this.mobileMenuOpen;
-            }
+        desktopSidebarVisible: !document.body.classList.contains('dashboard-sidebar-collapsed'),
+        init() {
+            window.addEventListener('dashboard-sidebar-state', event => {
+                this.desktopSidebarVisible = !event.detail.collapsed;
+            });
         },
         currentTime: new Date().toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' }),
         searchOpen: false,
@@ -1122,6 +1039,10 @@ function posTerminal() {
         favorites: [],
 
         init() {
+            window.addEventListener('dashboard-sidebar-state', event => {
+                this.desktopSidebarVisible = !event.detail.collapsed;
+            });
+            this.$nextTick(() => window.loadPosPopularDrugs?.());
             try {
                 const saved = localStorage.getItem('pharma_pos_fav_drugs');
                 if (saved) {

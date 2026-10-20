@@ -5,6 +5,7 @@
     x-show="isOpen"
     x-cloak
     @open-stock-in.window="openModal($event.detail)"
+    @close-stock-in.window="closeModal()"
     class="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 select-none">
     
     <div 
@@ -317,6 +318,7 @@ function stockInController() {
 
         openModal(initialData) {
             this.isOpen = true;
+            document.getElementById('stock-in-modal-container')?.classList.remove('hidden');
             this.successMsg = '';
             this.errorMsg = '';
             this.generateAutoBatch();
@@ -366,6 +368,7 @@ function stockInController() {
 
         closeModal() {
             this.isOpen = false;
+            document.getElementById('stock-in-modal-container')?.classList.add('hidden');
             // Also notify parent if needed
             if (typeof addBatchModalOpen !== 'undefined') {
                 try { addBatchModalOpen = false; } catch(e){}

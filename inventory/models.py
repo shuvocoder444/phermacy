@@ -77,6 +77,7 @@ class BrandDrug(models.Model):
     Commercial finished drug product sold in Bangladesh retail pharmacies (e.g. Napa Extra 500mg+65mg).
     """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey("core.Tenant", on_delete=models.CASCADE, null=True, blank=True, related_name="catalog_drugs", db_index=True)
     generic = models.ForeignKey(GenericDrug, on_delete=models.PROTECT, related_name="brands")
     manufacturer = models.ForeignKey(Manufacturer, on_delete=models.PROTECT, related_name="brand_products")
     dosage_form = models.ForeignKey(DosageForm, on_delete=models.PROTECT, related_name="brand_products")
@@ -108,6 +109,7 @@ class BrandDrug(models.Model):
     class Meta:
         ordering = ["brand_name"]
         indexes = [
+            models.Index(fields=["tenant", "brand_name", "is_active"]),
             models.Index(fields=["brand_name", "generic"]),
             models.Index(fields=["brand_name", "is_active"]),
             models.Index(fields=["barcode"]),
@@ -176,10 +178,13 @@ class DrugBatch(models.Model):
 
     class Meta:
         ordering = ["expiry_date"]
-        unique_together = ("drug", "batch_number")
+        constraints = [
+            models.UniqueConstraint(fields=("tenant", "drug", "batch_number"), name="uniq_tenant_drug_batch_number"),
+        ]
         indexes = [
             models.Index(fields=["drug", "expiry_date", "current_stock"]),
             models.Index(fields=["tenant", "current_stock", "expiry_date"]),
+            models.Index(fields=["tenant", "expiry_date"], name="batch_tenant_expiry_idx"),
         ]
         verbose_name = _("Drug Batch")
         verbose_name_plural = _("Drug Batches")

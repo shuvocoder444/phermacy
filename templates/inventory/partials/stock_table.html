@@ -1,3 +1,4 @@
+{% load humanize %}
 <div class="overflow-x-auto">
     <table class="w-full text-left border-collapse text-xs">
         <thead>
@@ -32,7 +33,7 @@
 
                 <!-- Batch Number -->
                 <td class="py-3 px-3">
-                    <span class="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-1 rounded-md text-[11px]">
+                    <span class="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-1 rounded-md text-[11px] whitespace-nowrap">
                         {{ batch.batch_number }}
                     </span>
                     {% if batch.supplier_challan_no %}
@@ -60,12 +61,12 @@
 
                 <!-- Purchase Price -->
                 <td class="py-3 px-3 text-right font-mono text-slate-600">
-                    ৳{{ batch.purchase_price }}
+                    ৳{{ batch.purchase_price|floatformat:2|intcomma }}
                 </td>
 
                 <!-- MRP -->
                 <td class="py-3 px-3 text-right font-mono font-bold text-slate-900">
-                    ৳{{ batch.unit_mrp }}
+                    ৳{{ batch.unit_mrp|floatformat:2|intcomma }}
                 </td>
 
                 <!-- Stock Qty with color warning -->
@@ -75,19 +76,19 @@
                         স্টক শেষ (০)
                     </span>
                     {% elif batch.current_stock <= 15 %}
-                    <span class="px-2.5 py-1 rounded-xl bg-amber-100 text-amber-800 font-extrabold text-xs border border-amber-200">
-                        {{ batch.current_stock }} পিস
+                    <span class="inline-flex whitespace-nowrap px-2.5 py-1 rounded-xl bg-amber-100 text-amber-800 font-extrabold text-xs border border-amber-200">
+                        {{ batch.current_stock|intcomma }} পিস
                     </span>
                     {% else %}
-                    <span class="px-2.5 py-1 rounded-xl bg-emerald-50 text-emerald-700 font-extrabold text-xs border border-emerald-200">
-                        {{ batch.current_stock }} পিস
+                    <span class="inline-flex whitespace-nowrap px-2.5 py-1 rounded-xl bg-emerald-50 text-emerald-700 font-extrabold text-xs border border-emerald-200">
+                        {{ batch.current_stock|intcomma }} পিস
                     </span>
                     {% endif %}
                 </td>
 
                 <!-- Stock Value -->
                 <td class="py-3 px-4 text-right font-mono font-black text-slate-800">
-                    ৳{{ batch.current_stock|floatformat:0 }}
+                    ৳{{ batch.stock_value|floatformat:2|intcomma }}
                 </td>
             </tr>
             {% empty %}

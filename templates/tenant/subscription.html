@@ -13,7 +13,7 @@
     <div x-show="sidebarOpen" x-cloak class="fixed inset-y-0 left-0 z-50 w-72 lg:hidden">
         {% include "partials/tenant_sidebar.html" with active_tab="subscription" %}
     </div>
-    <aside class="hidden lg:block h-screen shrink-0">
+    <aside class="dashboard-sidebar-wrapper hidden lg:block h-screen shrink-0">
         {% include "partials/tenant_sidebar.html" with active_tab="subscription" %}
     </aside>
 
@@ -62,7 +62,6 @@
                         </div>
                         <div class="mt-3 text-2xl font-black text-emerald-700">৳{{ plan.monthly_price_bdt }}<span class="text-xs font-medium text-slate-500"> / মাস</span></div>
                         <ul class="mt-4 flex-1 space-y-2 border-t border-slate-100 pt-4 text-sm text-slate-600">
-                            <li>✓ শাখা: <strong>{{ plan.max_branches }}</strong></li>
                             <li>✓ ব্যবহারকারী: <strong>{{ plan.max_users }}</strong></li>
                             <li>✓ অন্তর্ভুক্ত SMS: <strong>{{ plan.sms_bundle_included }}</strong></li>
                         </ul>

@@ -3,14 +3,19 @@
 {% block title %}কাস্টমার লেজার স্টেটমেন্ট - {{ customer.name }} | PharmaFlow POS{% endblock %}
 
 {% block content %}
-<div class="flex flex-col lg:flex-row h-screen bg-slate-50 overflow-hidden font-sans text-slate-800">
+<div x-data="{ sidebarOpen: false }" class="flex flex-col lg:flex-row h-screen bg-slate-50 overflow-hidden font-sans text-slate-800">
     <div class="lg:hidden absolute top-0 left-0 right-0 h-14 bg-white border-b border-slate-200 z-40 flex items-center gap-3 px-4 shadow-sm">
+        <button type="button" @click="sidebarOpen = true" class="shrink-0 p-2 rounded-xl bg-slate-100 text-slate-700" aria-label="মেনু খুলুন">☰</button>
         <a href="{% url 'customers:dashboard' %}" class="shrink-0 p-2 rounded-xl bg-slate-100 text-slate-700" aria-label="কাস্টমার তালিকায় ফিরুন">←</a>
         <span class="min-w-0 flex-1 truncate text-sm font-bold text-slate-800">{{ customer.name }} — স্টেটমেন্ট</span>
         <button onclick="window.print()" class="shrink-0 rounded-xl bg-slate-800 px-3 py-2 text-xs font-bold text-white">প্রিন্ট</button>
     </div>
+    <div x-show="sidebarOpen" x-cloak @click="sidebarOpen = false" class="fixed inset-0 z-40 bg-slate-900/60 backdrop-blur-sm lg:hidden" x-transition.opacity></div>
+    <div x-show="sidebarOpen" x-cloak class="fixed inset-y-0 left-0 z-50 w-72 lg:hidden" x-transition>
+        {% include "partials/tenant_sidebar.html" with active_tab="customers" %}
+    </div>
     <!-- Left Navigation Sidebar -->
-    <aside class="hidden lg:flex w-64 bg-white border-r border-slate-200 flex-col justify-between shrink-0 shadow-sm z-30">
+    <aside class="dashboard-sidebar-wrapper hidden lg:flex w-64 bg-white border-r border-slate-200 flex-col justify-between shrink-0 shadow-sm z-30">
         <div>
             <!-- Brand Logo -->
             <div class="h-16 flex items-center px-6 border-b border-slate-100 gap-3">

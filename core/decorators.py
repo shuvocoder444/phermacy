@@ -33,12 +33,15 @@ def tenant_user_required(view_func):
         if not request.user.is_authenticated:
             return redirect_to_login(request.get_full_path(), login_url='login')
 
-        # Super Admin is allowed everywhere
+        # Tenant pages always need an explicit tenant context, including for super admins.
         if request.user.is_superuser:
+            if not getattr(request, "tenant", None):
+                messages.error(request, "প্রথমে একটি সক্রিয় ফার্মেসি নির্বাচন করুন।")
+                return redirect("saas_admin:dashboard")
             return view_func(request, *args, **kwargs)
 
         profile = getattr(request.user, "staff_profile", None)
-        if not profile or not profile.tenant:
+        if not profile or not profile.is_active or not profile.tenant:
             messages.error(request, "আপনার অ্যাকাউন্টের সাথে কোনো ফার্মেসি যুক্ত নেই। অনুগ্রহ করে এডমিনের সাথে যোগাযোগ করুন।")
             return redirect("login")
 

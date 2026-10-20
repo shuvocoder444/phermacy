@@ -1,5 +1,5 @@
 from django.utils.deprecation import MiddlewareMixin
-from core.models import Tenant, StaffProfile
+from core.models import Domain, Tenant, StaffProfile
 
 
 class TenantMiddleware(MiddlewareMixin):
@@ -20,13 +20,13 @@ class TenantMiddleware(MiddlewareMixin):
                 # Super Admin can switch tenants or select one via session/GET
                 switch_id = request.GET.get("switch_tenant")
                 if switch_id:
-                    target = Tenant.objects.filter(id=switch_id).first()
+                    target = Tenant.objects.filter(id=switch_id, is_active=True).first()
                     if target:
                         request.session["active_tenant_id"] = str(target.id)
                         tenant = target
 
                 if not tenant and request.session.get("active_tenant_id"):
-                    tenant = Tenant.objects.filter(id=request.session["active_tenant_id"]).first()
+                    tenant = Tenant.objects.filter(id=request.session["active_tenant_id"], is_active=True).first()
             else:
                 # Regular staff/pharmacist/owner is 100% locked to their assigned pharmacy
                 profile = StaffProfile.objects.filter(user=user, is_active=True).select_related("tenant").first()
@@ -35,9 +35,12 @@ class TenantMiddleware(MiddlewareMixin):
 
         # 2. Subdomain Resolution (e.g. almadina.pos.webkoders.com)
         if not tenant:
-            host = request.get_host().split(":")[0]
+            host = request.get_host().split(":")[0].lower().rstrip(".")
+            domain = Domain.objects.filter(domain=host, tenant__is_active=True).select_related("tenant").first()
+            if domain:
+                tenant = domain.tenant
             subdomain = host.split(".")[0] if "." in host else ""
-            if subdomain and subdomain not in ("www", "localhost", "127", "pos"):
+            if not tenant and subdomain and subdomain not in ("www", "localhost", "127", "pos"):
                 tenant = Tenant.objects.filter(slug=subdomain, is_active=True).first()
 
         # 3. Session Fallback

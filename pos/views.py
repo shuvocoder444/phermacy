@@ -1,6 +1,7 @@
 import json
 from decimal import Decimal
 from django.shortcuts import render, get_object_or_404
+from django.template.loader import render_to_string
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.http import require_http_methods, require_GET, require_POST
 from django.views.decorators.csrf import csrf_exempt
@@ -11,15 +12,14 @@ from django.db.models import Q, Sum, Count, Prefetch, Case, When, Value, Integer
 
 from inventory.models import BrandDrug, DrugBatch
 from inventory.services import DrugSearchAndCacheService
-from customers.models import Customer, DueLedger
 from .models import Invoice, InvoiceItem, CashRegisterSession
 from .cart import POSCartManager
 from .services import POSCheckoutService, ThermalReceiptGenerator
-from notifications.sms_services import BangladeshSMSGateway
-from core.decorators import tenant_user_required
+from core.decorators import super_admin_required, tenant_user_required
 
 
-def get_popular_pos_drugs(tenant_key: str, limit: int = 60):
+
+def get_popular_pos_drugs(tenant_key: str, limit: int = 60, favorite_names=None):
     """
     Retrieves all tenant inventory-stocked medicines first, supplemented by top-selling/popular 
     essential drugs with FEFO batch stock for the POS quick-add side panel.
@@ -30,7 +30,9 @@ def get_popular_pos_drugs(tenant_key: str, limit: int = 60):
     # 1. Tenant-aware batch filter
     batch_filter = Q(current_stock__gt=0)
     if tenant_key and tenant_key != "default_tenant":
-        batch_filter &= (Q(tenant_id=tenant_key) | Q(tenant__isnull=True))
+        batch_filter &= Q(tenant_id=tenant_key)
+    else:
+        batch_filter &= Q(pk__in=[])
 
     popular_names = [
         "Napa Extra", "Napa", "Sergel 20", "Ace Plus", "Ace", "Maxpro 20",
@@ -63,10 +65,21 @@ def get_popular_pos_drugs(tenant_key: str, limit: int = 60):
 
     # Step 1: Fetch tenant's active batches directly!
     # This guarantees every item in "ইনভেন্টরি ও ব্যাচ স্টক (FEFO)" appears on POS screen.
-    tenant_batches = (
-        DrugBatch.objects.filter(batch_filter)
-        .select_related("drug", "drug__generic", "drug__dosage_form", "drug__manufacturer")
-        .order_by("expiry_date")
+    tenant_batches = DrugBatch.objects.filter(batch_filter)
+    favorite_names = list(dict.fromkeys(
+        name.strip() for name in (favorite_names or []) if name and name.strip()
+    ))[:30]
+    if favorite_names:
+        favorite_rank = Case(
+            *[When(drug__brand_name=name, then=Value(index)) for index, name in enumerate(favorite_names)],
+            default=Value(len(favorite_names)),
+            output_field=IntegerField(),
+        )
+        tenant_batches = tenant_batches.order_by(favorite_rank, "expiry_date")
+    else:
+        tenant_batches = tenant_batches.order_by("expiry_date")
+    tenant_batches = tenant_batches.select_related(
+        "drug", "drug__generic", "drug__dosage_form", "drug__manufacturer"
     )
     for batch in tenant_batches[:200]:
         drug = batch.drug
@@ -110,13 +123,16 @@ def get_popular_pos_drugs(tenant_key: str, limit: int = 60):
 
     # Step 2: If pharmacy has fewer items than limit, supplement with popular essential drugs that have batches
     if len(results) < limit:
+        catalog_filter = Q(tenant__isnull=True)
+        if tenant_key and tenant_key != "default_tenant":
+            catalog_filter |= Q(tenant_id=tenant_key)
         fefo_prefetch = Prefetch(
             "batches",
             queryset=DrugBatch.objects.filter(batch_filter).order_by("expiry_date"),
             to_attr="prefetched_fefo_batches"
         )
         popular_qs = (
-            BrandDrug.objects.filter(brand_name__in=popular_names, is_active=True)
+            BrandDrug.objects.filter(catalog_filter, brand_name__in=popular_names, is_active=True)
             .select_related("generic", "manufacturer", "dosage_form")
             .prefetch_related(fefo_prefetch)
         )
@@ -191,9 +207,9 @@ def pos_screen_view(request):
     tenant_id = getattr(request, "tenant", None)
     tenant_key = str(tenant_id.id) if tenant_id and hasattr(tenant_id, "id") else "default_tenant"
     
-    # Pre-prime top drugs in background/cache if empty
-    DrugSearchAndCacheService.prime_top_drugs_cache(tenant_id=tenant_key, limit=100)
-    popular_drugs = get_popular_pos_drugs(tenant_key=tenant_key, limit=100)
+    # Load the quick-add catalog separately so its inventory queries do not block
+    # the POS screen from appearing.
+    popular_drugs = []
     
     context = {
         "cart": cart,
@@ -201,12 +217,27 @@ def pos_screen_view(request):
         "today": timezone.now().date(),
         "store_name": getattr(tenant_id, "name", "Popular Pharmacy & Care"),
         "store_phone": getattr(tenant_id, "phone", "01711-000000"),
+        "store_logo": tenant_id.logo.url if tenant_id and tenant_id.logo else "",
         "tenant": tenant_id,
         "subscription": getattr(tenant_id, "subscription", None) if tenant_id else None,
     }
     return render(request, "pos/pos.html", context)
 
 
+@tenant_user_required
+@require_GET
+def popular_drugs_htmx(request):
+    tenant_id = getattr(request, "tenant", None)
+    tenant_key = str(tenant_id.id) if tenant_id and hasattr(tenant_id, "id") else "default_tenant"
+    favorite_names = request.GET.getlist("favorite")
+    return render(request, "pos/partials/popular_drugs.html", {
+        "popular_drugs": get_popular_pos_drugs(
+            tenant_key=tenant_key, limit=100, favorite_names=favorite_names
+        ),
+    })
+
+
+@tenant_user_required
 @require_GET
 def drug_search_htmx(request):
     """
@@ -226,6 +257,7 @@ def drug_search_htmx(request):
     return render(request, "pos/partials/search_results.html", context)
 
 
+@tenant_user_required
 @require_POST
 def cart_add_htmx(request):
     """
@@ -251,6 +283,7 @@ def cart_add_htmx(request):
     return render(request, "pos/partials/cart_table.html", context)
 
 
+@tenant_user_required
 @require_POST
 def cart_update_quantity_htmx(request):
     """
@@ -266,6 +299,7 @@ def cart_update_quantity_htmx(request):
     return render(request, "pos/partials/cart_table.html", context)
 
 
+@tenant_user_required
 @require_POST
 def cart_remove_item_htmx(request):
     """
@@ -279,6 +313,7 @@ def cart_remove_item_htmx(request):
     return render(request, "pos/partials/cart_table.html", context)
 
 
+@tenant_user_required
 @require_POST
 def cart_apply_discount_htmx(request):
     """
@@ -301,6 +336,7 @@ def cart_apply_discount_htmx(request):
     return render(request, "pos/partials/cart_table.html", context)
 
 
+@tenant_user_required
 @require_POST
 def cart_clear_htmx(request):
     """
@@ -312,6 +348,7 @@ def cart_clear_htmx(request):
     return render(request, "pos/partials/cart_table.html", {"cart": cart, "is_htmx": True})
 
 
+@tenant_user_required
 @require_POST
 def hold_cart_htmx(request):
     """
@@ -343,6 +380,7 @@ def hold_cart_htmx(request):
     return render(request, "pos/partials/cart_table.html", {"cart": cart, "is_htmx": True})
 
 
+@tenant_user_required
 @require_GET
 def held_carts_modal(request):
     """
@@ -352,6 +390,7 @@ def held_carts_modal(request):
     return render(request, "pos/partials/held_carts_modal.html", {"held_carts": held_carts})
 
 
+@tenant_user_required
 @require_POST
 def resume_cart_htmx(request, hold_id):
     """
@@ -376,27 +415,29 @@ def resume_cart_htmx(request, hold_id):
     return render(request, "pos/partials/cart_table.html", {"cart": cart, "is_htmx": True})
 
 
+@tenant_user_required
 @require_GET
 def checkout_modal_htmx(request):
-    """
-    Renders the checkout tender modal with payment methods (Cash, bKash, Nagad, Rocket, Due).
-    """
+    """Render the cash checkout form from the current cart with pharmacy customer dropdown list."""
     cart_manager = get_cart_manager(request)
     cart = cart_manager.get_cart_summary()
     tenant = getattr(request, "tenant", None)
-    
-    # Search or pass customer
-    customer_phone = request.GET.get("phone", "").strip()
-    customer = None
-    if customer_phone:
-        cust_qs = Customer.objects.filter(phone=customer_phone)
-        if tenant:
-            cust_qs = cust_qs.filter(tenant=tenant)
-        customer = cust_qs.first()
+    customers = []
+    if tenant:
+        try:
+            from customers.models import Customer
+            customers = list(
+                Customer.objects.filter(tenant=tenant, is_active=True)
+                .order_by("name")
+                .values("id", "name", "phone", "current_due")[:200]
+            )
+        except Exception:
+            customers = []
 
     context = {
         "cart": cart,
-        "customer": customer,
+        "customers": customers,
+        "customer": None,
         "total_payable": cart["total_payable"],
     }
     return render(request, "pos/partials/checkout_modal.html", context)
@@ -412,11 +453,26 @@ def checkout_submit_htmx(request):
     cart_manager = get_cart_manager(request)
     tenant = getattr(request, "tenant", None)
     
-    payment_method = request.POST.get("payment_method", "CASH")
+    payment_method = request.POST.get("payment_method", "CASH").strip().upper()
+    if payment_method not in {"CASH", "DUE", "SPLIT"}:
+        payment_method = "CASH"
     paid_amount = Decimal(request.POST.get("paid_amount", "0.00") or "0.00")
-    customer_id = request.POST.get("customer_id") or None
-    customer_name = request.POST.get("customer_name", "Walk-in Customer")
+    customer_id = request.POST.get("customer_id", "").strip() or None
+    customer_name = request.POST.get("customer_name", "").strip() or "Walk-in Customer"
     customer_phone = request.POST.get("customer_phone", "").strip()
+
+    # If user selected or typed a new customer with a phone number, ensure linked to Customer profile
+    if not customer_id and customer_name and customer_name != "Walk-in Customer" and customer_phone and len(customer_phone) >= 11:
+        try:
+            from customers.models import Customer
+            new_cust, _ = Customer.objects.get_or_create(
+                tenant=tenant,
+                phone=customer_phone,
+                defaults={"name": customer_name}
+            )
+            customer_id = str(new_cust.id)
+        except Exception:
+            pass
     gateway_trx_id = request.POST.get("gateway_trx_id", "").strip()
     doctor_name = request.POST.get("doctor_name", "").strip()
 
@@ -440,23 +496,18 @@ def checkout_submit_htmx(request):
             tenant=tenant,
         )
 
-        # Dispatch optional SMS confirmation
-        if customer_phone:
-            tenant_name = getattr(tenant, "name", "Pharmacy Care") if tenant else "Pharmacy Care"
-            BangladeshSMSGateway.send_invoice_sms(
-                customer_phone=customer_phone,
-                invoice_number=invoice.invoice_number,
-                total_payable=str(invoice.total_payable),
-                due_amount=str(invoice.due_amount),
-                pharmacy_name=tenant_name,
-            )
-
         context = {
             "invoice": invoice,
             "items": invoice.items.select_related("drug", "batch").all(),
             "summary": summary,
         }
-        return render(request, "pos/partials/receipt_modal.html", context)
+        receipt_html = render_to_string("pos/partials/receipt_modal.html", context, request=request)
+        cleared_cart_html = render_to_string("pos/partials/cart_table.html", {
+            "cart": cart_manager.get_cart_summary(),
+            "is_htmx": True,
+            "cart_oob": True,
+        }, request=request)
+        return HttpResponse(receipt_html + cleared_cart_html)
 
     except Exception as e:
         return HttpResponse(
@@ -480,8 +531,10 @@ def print_thermal_receipt(request, invoice_id):
     """
     tenant = getattr(request, "tenant", None)
     invoice_qs = Invoice.objects.select_related("cashier", "customer")
-    if tenant and not (request.user.is_authenticated and request.user.is_superuser):
+    if tenant:
         invoice_qs = invoice_qs.filter(tenant=tenant)
+    else:
+        invoice_qs = invoice_qs.none()
     invoice = get_object_or_404(invoice_qs, id=invoice_id)
     items = invoice.items.select_related("drug", "batch").all()
     
@@ -496,6 +549,7 @@ def print_thermal_receipt(request, invoice_id):
         "store_name": store_name,
         "store_phone": store_phone,
         "store_address": store_address,
+        "store_logo": tenant.logo.url if tenant and tenant.logo else "",
         "vat_reg": vat_reg,
     }
     return render(request, "pos/thermal_receipt_80mm.html", context)
@@ -517,6 +571,7 @@ def recent_invoices_modal(request):
     return render(request, "pos/partials/recent_invoices_modal.html", context)
 
 
+@tenant_user_required
 @require_POST
 def add_custom_drug_and_batch_htmx(request):
     """
@@ -581,20 +636,23 @@ def add_custom_drug_and_batch_htmx(request):
     )
 
     # 4. BrandDrug
-    drug, _ = BrandDrug.objects.get_or_create(
-        brand_name=brand_name,
-        strength=strength,
-        defaults={
-            "brand_name_bn": brand_name_bn or brand_name,
-            "dosage_form": dosage_form,
-            "manufacturer": manufacturer,
-            "generic": generic,
-            "unit_mrp": unit_mrp,
-            "unit_tp": unit_tp,
-            "rack_location": rack_location,
-            "is_active": True,
-        }
-    )
+    tenant = getattr(request, "tenant", None)
+    catalog_filter = Q(tenant__isnull=True) | Q(tenant=tenant)
+    drug = BrandDrug.objects.filter(catalog_filter, brand_name__iexact=brand_name, strength__iexact=strength).first()
+    if not drug:
+        drug = BrandDrug.objects.create(
+            brand_name=brand_name,
+            strength=strength,
+            tenant=tenant,
+            brand_name_bn=brand_name_bn or brand_name,
+            dosage_form=dosage_form,
+            manufacturer=manufacturer,
+            generic=generic,
+            unit_mrp=unit_mrp,
+            unit_tp=unit_tp,
+            rack_location=rack_location,
+            is_active=True,
+        )
 
     # 5. Create FEFO DrugBatch
     tenant = getattr(request, "tenant", None)
@@ -633,6 +691,7 @@ from .ocr_service import scan_medicine_ocr, process_camera_scan_htmx
 from .voice_service import voice_medicine_search, voice_add_to_cart_htmx
 
 
+@tenant_user_required
 @csrf_exempt
 @require_POST
 def train_medicine_alias_view(request):
@@ -646,7 +705,10 @@ def train_medicine_alias_view(request):
         return JsonResponse({"status": "failed", "message": "উচ্চারণ/নাম এবং ওষুধের নাম উভয়ই আবশ্যক।"}, status=400)
 
     from pos.training_service import DrugTrainingService
-    success = DrugTrainingService.save_trained_alias(alias_phrase=alias, brand_name=brand_name)
+    tenant = getattr(request, "tenant", None)
+    success = DrugTrainingService.save_trained_alias(
+        alias_phrase=alias, brand_name=brand_name, tenant_id=str(tenant.id) if tenant else ""
+    )
     if success:
         return JsonResponse({
             "status": "success",
@@ -657,6 +719,7 @@ def train_medicine_alias_view(request):
     return JsonResponse({"status": "failed", "message": "সংরক্ষণ করা যায়নি।"}, status=500)
 
 
+@super_admin_required
 @csrf_exempt
 def ai_config_view(request):
     """
@@ -693,6 +756,7 @@ def ai_config_view(request):
     })
 
 
+@super_admin_required
 @csrf_exempt
 @require_POST
 def test_gemini_connection_view(request):

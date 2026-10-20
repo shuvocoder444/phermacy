@@ -9,10 +9,10 @@ from django.utils.translation import gettext_lazy as _
 
 class Tenant(models.Model):
     """
-    Tenant model for Pharmacy Business / Chain (SQLite & Multi-tenant compatible).
+    Tenant model for Independent Pharmacy Business (SQLite & Multi-tenant compatible).
     """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    name = models.CharField(max_length=150, help_text="Pharmacy or Chain Name in English")
+    name = models.CharField(max_length=150, help_text="Pharmacy Name in English")
     name_bn = models.CharField(max_length=200, blank=True, null=True, help_text="নাম বাংলায় (Bangla Name)")
     slug = models.SlugField(max_length=100, unique=True, default="default-pharmacy")
      
@@ -22,6 +22,7 @@ class Tenant(models.Model):
     phone = models.CharField(max_length=20, db_index=True)
     email = models.EmailField(blank=True, null=True)
     address = models.TextField(blank=True, null=True)
+    logo = models.ImageField(upload_to="tenant_logos/", blank=True, null=True)
     division = models.CharField(max_length=50, blank=True, null=True)
     district = models.CharField(max_length=50, blank=True, null=True)
     thana = models.CharField(max_length=50, blank=True, null=True)
@@ -55,15 +56,14 @@ class Domain(models.Model):
 
 class SubscriptionPlan(models.Model):
     PLAN_TIERS = (
-        ("starter", "Starter (Single Counter)"),
-        ("pro", "Pro (Multi-Counter & SMS)"),
-        ("enterprise", "Enterprise (Multi-Branch & Warehousing)"),
+        ("starter", "Starter (Single Pharmacy)"),
+        ("pro", "Pro (Pharmacy & SMS)"),
+        ("enterprise", "Enterprise (Advanced Pharmacy)"),
     )
     name = models.CharField(max_length=100)
     tier = models.CharField(max_length=30, choices=PLAN_TIERS, default="starter")
     monthly_price_bdt = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("999.00"))
     yearly_price_bdt = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("9990.00"))
-    max_branches = models.PositiveIntegerField(default=1)
     max_users = models.PositiveIntegerField(default=3)
     sms_bundle_included = models.PositiveIntegerField(default=200, help_text="Monthly free SMS quota")
     features = models.JSONField(default=dict, blank=True)
@@ -227,6 +227,4 @@ class PlatformSetting(models.Model):
                 return self.logo.url
             except Exception:
                 pass
-        if self.logo_url:
-            return self.logo_url
         return None

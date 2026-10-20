@@ -8,6 +8,8 @@ from django.contrib.auth.models import User
 from django.contrib import messages
 from django.utils import timezone
 from django.utils.text import slugify
+from django.core.paginator import Paginator
+from django.db import transaction
 
 from core.models import Tenant, SubscriptionPlan, TenantSubscription, StaffProfile, PlatformSetting
 from core.decorators import super_admin_required
@@ -24,7 +26,6 @@ def saas_admin_dashboard(request):
     SaaS Super Admin Platform Dashboard.
     Provides complete oversight over all pharmacy subscribers, MRR, subscriptions, and system health.
     """
-    ensure_default_subscription_plans()
     metrics = get_platform_metrics()
 
     # Search & Filter
@@ -55,9 +56,11 @@ def saas_admin_dashboard(request):
 
     plans = SubscriptionPlan.objects.all().order_by("monthly_price_bdt")
 
+    tenant_page = Paginator(tenants_qs, 25).get_page(request.GET.get("page"))
     context = {
         "metrics": metrics,
-        "tenants": tenants_qs,
+        "tenants": tenant_page,
+        "tenant_page": tenant_page,
         "plans": plans,
         "search_q": search_q,
         "status_filter": status_filter,
@@ -70,10 +73,7 @@ def saas_admin_dashboard(request):
 @super_admin_required
 @require_POST
 def saas_tenant_create(request):
-    """
-    Onboards a new pharmacy tenant onto the SaaS platform.
-    Automatically provisions Tenant, Subdomain Slug, and TenantSubscription.
-    """
+    """Create one isolated pharmacy tenant and its tenant-admin account."""
     name = request.POST.get("name", "").strip()
     name_bn = request.POST.get("name_bn", "").strip()
     phone = request.POST.get("phone", "").strip()
@@ -81,13 +81,23 @@ def saas_tenant_create(request):
     address = request.POST.get("address", "").strip()
     raw_slug = request.POST.get("slug", "").strip()
     plan_tier = request.POST.get("plan_tier", "pro").strip()
-    duration_days = int(request.POST.get("duration_days", "30"))
+    owner_username = request.POST.get("owner_username", "").strip()
+    owner_password = request.POST.get("owner_password", "")
+    try:
+        duration_days = int(request.POST.get("duration_days", "30"))
+    except (TypeError, ValueError):
+        duration_days = 30
 
-    if not name or not phone:
-        messages.error(request, "ফার্মেসির নাম ও মোবাইল নম্বর দেওয়া বাধ্যতামূলক।")
+    if not name or not phone or not owner_username or not owner_password:
+        messages.error(request, "Pharmacy name, phone, tenant admin username and password are required.")
+        return redirect("saas_admin:dashboard")
+    if len(owner_password) < 8:
+        messages.error(request, "Tenant admin password must contain at least 8 characters.")
+        return redirect("saas_admin:dashboard")
+    if User.objects.filter(username__iexact=owner_username).exists():
+        messages.error(request, "That username is already in use. Choose another username.")
         return redirect("saas_admin:dashboard")
 
-    # Generate unique slug
     base_slug = slugify(raw_slug or name) or "pharmacy"
     unique_slug = base_slug
     counter = 1
@@ -95,54 +105,37 @@ def saas_tenant_create(request):
         unique_slug = f"{base_slug}-{counter}"
         counter += 1
 
-    # Create Tenant
-    tenant = Tenant.objects.create(
-        name=name,
-        name_bn=name_bn or name,
-        slug=unique_slug,
-        phone=phone,
-        email=email,
-        address=address,
-        is_active=True,
-    )
-
-    # Attach Subscription Plan
-    plan = SubscriptionPlan.objects.filter(tier=plan_tier).first()
-    if not plan:
-        ensure_default_subscription_plans()
-        plan = SubscriptionPlan.objects.filter(tier=plan_tier).first() or SubscriptionPlan.objects.first()
-
-    status = "trial" if duration_days <= 30 else "active"
-    TenantSubscription.objects.create(
-        tenant=tenant,
-        plan=plan,
-        status=status,
-        start_date=timezone.now().date(),
-        expires_at=timezone.now().date() + timedelta(days=duration_days),
-        sms_balance=plan.sms_bundle_included if plan else 200,
-        auto_renew=True,
-    )
-
-    # Optionally create pharmacy owner user account
-    owner_username = request.POST.get("owner_username", "").strip()
-    owner_password = request.POST.get("owner_password", "").strip()
-    if owner_username and owner_password:
-        if not User.objects.filter(username=owner_username).exists():
+    try:
+        with transaction.atomic():
+            plan = SubscriptionPlan.objects.filter(tier=plan_tier, is_active=True).first()
+            if not plan:
+                ensure_default_subscription_plans()
+                plan = SubscriptionPlan.objects.filter(tier=plan_tier, is_active=True).first()
+            if not plan:
+                raise ValueError("No active subscription plan is available.")
+            tenant = Tenant.objects.create(
+                name=name, name_bn=name_bn or name, slug=unique_slug,
+                phone=phone, email=email, address=address, is_active=True,
+            )
+            status = "trial" if duration_days <= 30 else "active"
+            TenantSubscription.objects.create(
+                tenant=tenant, plan=plan, status=status,
+                start_date=timezone.now().date(),
+                expires_at=timezone.now().date() + timedelta(days=duration_days),
+                sms_balance=plan.sms_bundle_included, auto_renew=True,
+            )
             user = User.objects.create_user(
-                username=owner_username,
-                password=owner_password,
-                email=email,
-                first_name=name,
+                username=owner_username, password=owner_password,
+                email=email, first_name=name,
             )
             StaffProfile.objects.create(
-                user=user,
-                tenant=tenant,
-                role="owner",
-                phone=phone,
-                is_active=True,
+                user=user, tenant=tenant, role="owner", phone=phone, is_active=True,
             )
+    except Exception as exc:
+        messages.error(request, f"Pharmacy account was not created: {exc}")
+        return redirect("saas_admin:dashboard")
 
-    messages.success(request, f"সফলভাবে নতুন ফার্মাসি '{tenant.name}' তৈরি ও সাবস্ক্রিপশন চালু হয়েছে!")
+    messages.success(request, f"Tenant '{tenant.name}' and its admin account were created. Login username: {owner_username}")
     return redirect("saas_admin:dashboard")
 
 
@@ -234,7 +227,7 @@ def saas_tenant_detail(request, tenant_id):
 def saas_platform_branding_save(request):
     """
     SaaS Super Admin: Update platform logo, branding, title, and contact details.
-    Accepts uploaded file or direct logo URL, or clears custom logo to restore default.
+    Accepts an uploaded local file, or clears custom logo to restore default.
     """
     settings_obj = PlatformSetting.get_settings()
     
@@ -242,7 +235,6 @@ def saas_platform_branding_save(request):
     platform_tagline = request.POST.get("platform_tagline", "").strip()
     support_phone = request.POST.get("support_phone", "").strip()
     support_email = request.POST.get("support_email", "").strip()
-    logo_url = request.POST.get("logo_url", "").strip()
     clear_logo = request.POST.get("clear_logo") == "1"
 
     if platform_name:
@@ -266,9 +258,6 @@ def saas_platform_branding_save(request):
         logo_file = request.FILES["logo"]
         settings_obj.logo = logo_file
         settings_obj.logo_url = ""
-    elif logo_url:
-        settings_obj.logo_url = logo_url
-
     settings_obj.save()
     messages.success(request, "প্ল্যাটফর্ম লোগো ও ব্র্যান্ডিং সেটিংস সফলভাবে আপডেট করা হয়েছে।")
     return redirect("saas_admin:dashboard")

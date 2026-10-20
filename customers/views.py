@@ -14,11 +14,11 @@ from .models import Customer, DueLedger
 
 def get_or_create_due_collection_category():
     cat, _ = LedgerCategory.objects.get_or_create(
-        name="কাস্টমার বাকি আদায় (Due Collection)",
+        name="Customer Due Collection (Baki)",
+        category_type="INCOME",
         defaults={
-            "type": "INCOME",
-            "code": "CUST-DUE-INCOME",
-            "is_system_default": True
+            "name_bn": "বকেয়া আদায় (বাকি খাতা)",
+            "is_system_default": True,
         }
     )
     return cat
@@ -77,7 +77,9 @@ def customer_dashboard(request):
         "filter_due": filter_due,
     }
 
-    if request.headers.get("HX-Request"):
+    # HTMX boosted page navigation needs the full layout; only table refreshes
+    # should receive this partial response.
+    if request.headers.get("HX-Request") and not request.headers.get("HX-Boosted"):
         return render(request, "customers/partials/customer_table.html", context)
 
     return render(request, "customers/dashboard.html", context)
@@ -265,3 +267,4 @@ def search_customers_api(request):
         })
 
     return JsonResponse({"results": results})
+

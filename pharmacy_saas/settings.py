@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django.contrib.humanize",
     # SaaS Apps
     "core",
     "inventory",
@@ -159,5 +160,8 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 SMS_API_KEY = os.environ.get("SMS_API_KEY", "mock_key")
 SMS_SENDER_ID = os.environ.get("SMS_SENDER_ID", "PHARMA")
 
-SESSION_SAVE_EVERY_REQUEST = True
+# Django's default is to persist sessions only when a view actually changes
+# them. Saving an unchanged session on every boosted/HTMX navigation adds a
+# database UPDATE to every page request.
+SESSION_SAVE_EVERY_REQUEST = False
 SESSION_COOKIE_SAMESITE = 'Lax'
