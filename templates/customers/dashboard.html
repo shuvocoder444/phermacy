@@ -3,12 +3,7 @@
 {% block title %}কাস্টমার ও বাকি খাতা (Customer Due Ledger) | PharmaFlow POS{% endblock %}
 
 {% block content %}
-<div class="flex flex-col lg:flex-row h-screen bg-slate-50 overflow-hidden font-sans text-slate-800 relative" x-data="{
-    sidebarOpen: false,
-    addCustomerModal: false,
-    collectDueModal: false,
-    selectedCustomer: { id: '', name: '', phone: '', current_due: 0 }
-}">
+<div class="flex flex-col lg:flex-row h-screen bg-slate-50 overflow-hidden font-sans text-slate-800 relative" x-data="customerDashboardController()">
 
     <!-- Mobile Top Navigation Header -->
     <div class="lg:hidden absolute top-0 left-0 right-0 h-14 bg-white border-b border-slate-200 z-40 flex items-center justify-between px-4 shadow-sm">
@@ -166,31 +161,53 @@
     </div>
 
     <!-- Modal: Collect Due -->
-    <div x-show="collectDueModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" x-cloak>
-        <div @click.away="collectDueModal = false" class="bg-white rounded-t-3xl sm:rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-slate-100 pb-safe max-h-[90dvh] overflow-y-auto">
+    <div x-show="collectDueModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 select-none" x-cloak>
+        <div @click.away="if(!isSubmittingDue) collectDueModal = false" class="bg-white rounded-t-3xl sm:rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-slate-100 pb-safe max-h-[90dvh] overflow-y-auto">
             <div class="flex items-center justify-between pb-4 border-b border-slate-100">
                 <div>
-                    <h3 class="text-sm font-bold text-slate-900">বাকি টাকা আদায় (Due Collection)</h3>
-                    <p class="text-[11px] text-slate-500" x-text="selectedCustomer.name + ' (' + selectedCustomer.phone + ')'"></p>
+                    <h3 class="text-sm font-extrabold text-slate-900">বাকি টাকা আদায় (Due Collection)</h3>
+                    <p class="text-xs text-slate-500 font-semibold" x-text="selectedCustomer.name + ' (' + selectedCustomer.phone + ')'"></p>
                 </div>
-                <button @click="collectDueModal = false" class="text-slate-400 hover:text-slate-600 font-bold text-lg">&times;</button>
+                <button type="button" @click="collectDueModal = false" class="text-slate-400 hover:text-slate-600 font-bold text-lg leading-none">&times;</button>
             </div>
 
-            <div class="my-4 p-3 bg-rose-50 border border-rose-100 rounded-xl flex items-center justify-between">
+            <!-- Error Banner -->
+            <div x-show="dueErrorMsg" x-cloak class="my-3 p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold rounded-xl flex items-center justify-between">
+                <span x-text="dueErrorMsg"></span>
+                <span class="cursor-pointer font-black" @click="dueErrorMsg = ''">&times;</span>
+            </div>
+
+            <!-- Success Banner -->
+            <div x-show="dueSuccessMsg" x-cloak class="my-3 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold rounded-xl flex items-center justify-between">
+                <span x-text="dueSuccessMsg"></span>
+                <span>✓</span>
+            </div>
+
+            <!-- Current Due Banner -->
+            <div class="my-4 p-3.5 bg-rose-50 border border-rose-100 rounded-2xl flex items-center justify-between">
                 <span class="text-xs font-bold text-rose-700">বর্তমান অনাদায়ী বাকি:</span>
-                <span class="text-base font-black text-rose-700 font-mono" x-text="'৳' + Number(selectedCustomer.current_due).toFixed(2)"></span>
+                <span class="text-lg font-black text-rose-700 font-mono" x-text="'৳' + Number(selectedCustomer.current_due || 0).toFixed(2)"></span>
             </div>
 
-            <form :action="'/customers/collect-due/' + selectedCustomer.id + '/'" method="POST" class="space-y-4">
+            <form @submit.prevent="submitDueCollection()" class="space-y-4">
                 {% csrf_token %}
                 <div>
                     <label class="block text-xs font-bold text-slate-700 mb-1">আদায়কৃত টাকার পরিমাণ (৳) *</label>
-                    <input type="number" step="0.01" name="amount" required :max="selectedCustomer.current_due" :value="selectedCustomer.current_due" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-black font-mono text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                    <input 
+                        type="number" 
+                        step="0.01" 
+                        id="collect-due-amount-input"
+                        x-model="collectionAmount"
+                        required 
+                        min="1"
+                        class="w-full bg-slate-50 border border-slate-300 focus:border-emerald-500 rounded-xl px-3.5 py-2.5 text-base font-black font-mono text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none transition-all shadow-sm">
                 </div>
 
                 <div>
                     <label class="block text-xs font-bold text-slate-700 mb-1">পেমেন্ট মাধ্যম *</label>
-                    <select name="payment_method" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                    <select 
+                        x-model="paymentMethod"
+                        class="w-full bg-slate-50 border border-slate-300 focus:border-emerald-500 rounded-xl px-3.5 py-2.5 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-none transition-all cursor-pointer">
                         <option value="CASH">ক্যাশ (Cash)</option>
                         <option value="BKASH">বিকাশ (bKash)</option>
                         <option value="NAGAD">নগদ (Nagad)</option>
@@ -201,17 +218,136 @@
 
                 <div>
                     <label class="block text-xs font-bold text-slate-700 mb-1">ট্রানজেকশন আইডি / রেফারেন্স</label>
-                    <input type="text" name="trx_id" placeholder="যেমন: 9J3K8L2..." class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                    <input 
+                        type="text" 
+                        x-model="trxId"
+                        placeholder="যেমন: 9J3K8L2..." 
+                        class="w-full bg-slate-50 border border-slate-300 focus:border-emerald-500 rounded-xl px-3.5 py-2.5 text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none transition-all">
                 </div>
 
-                <div class="flex justify-end gap-2 pt-2">
-                    <button type="button" @click="collectDueModal = false" class="px-4 py-2.5 bg-slate-100 text-slate-700 font-bold rounded-xl text-xs hover:bg-slate-200">বাতিল</button>
-                    <button type="submit" class="px-5 py-2.5 bg-emerald-600 text-white font-bold rounded-xl text-xs hover:bg-emerald-700 shadow-sm active:scale-95 flex items-center gap-1.5">
-                        <span>আদায় সম্পন্ন করুন</span>
+                <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                    <button 
+                        type="button" 
+                        :disabled="isSubmittingDue"
+                        @click="collectDueModal = false" 
+                        class="px-4 py-2.5 bg-slate-100 text-slate-700 font-bold rounded-xl text-xs hover:bg-slate-200 transition-colors">
+                        বাতিল
+                    </button>
+                    <button 
+                        type="submit" 
+                        :disabled="isSubmittingDue"
+                        class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-xl text-xs shadow-md shadow-emerald-600/25 active:scale-95 flex items-center gap-1.5 transition-all cursor-pointer">
+                        <span x-show="!isSubmittingDue">আদায় সম্পন্ন করুন</span>
+                        <span x-show="isSubmittingDue" class="flex items-center gap-1.5">
+                            <svg class="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span>প্রসেসিং হচ্ছে...</span>
+                        </span>
                     </button>
                 </div>
             </form>
         </div>
     </div>
 </div>
+
+<script>
+function customerDashboardController() {
+    return {
+        sidebarOpen: false,
+        addCustomerModal: false,
+        collectDueModal: false,
+        selectedCustomer: { id: '', name: '', phone: '', current_due: 0 },
+        collectionAmount: '',
+        paymentMethod: 'CASH',
+        trxId: '',
+        isSubmittingDue: false,
+        dueErrorMsg: '',
+        dueSuccessMsg: '',
+
+        openCollectModal(cust) {
+            this.selectedCustomer = cust;
+            this.collectionAmount = parseFloat(cust.current_due) || 0;
+            this.paymentMethod = 'CASH';
+            this.trxId = '';
+            this.dueErrorMsg = '';
+            this.dueSuccessMsg = '';
+            this.isSubmittingDue = false;
+            this.collectDueModal = true;
+            this.$nextTick(() => {
+                const amtInput = document.getElementById('collect-due-amount-input');
+                if (amtInput) {
+                    amtInput.focus();
+                    amtInput.select();
+                }
+            });
+        },
+
+        async submitDueCollection() {
+            if (!this.selectedCustomer || !this.selectedCustomer.id) {
+                this.dueErrorMsg = 'কোনো কাস্টমার নির্বাচন করা হয়নি!';
+                return;
+            }
+
+            const amt = parseFloat(this.collectionAmount);
+            const maxDue = parseFloat(this.selectedCustomer.current_due);
+
+            if (isNaN(amt) || amt <= 0) {
+                this.dueErrorMsg = 'অনুগ্রহ করে সঠিক টাকার পরিমাণ দিন!';
+                return;
+            }
+            if (amt > maxDue + 0.01) {
+                this.dueErrorMsg = `আদায়কৃত টাকা বর্তমান বকেয়া (৳${maxDue.toFixed(2)})-এর চেয়ে বেশি হতে পারে না!`;
+                return;
+            }
+
+            this.isSubmittingDue = true;
+            this.dueErrorMsg = '';
+            this.dueSuccessMsg = '';
+
+            const formData = new FormData();
+            formData.append('amount', amt.toFixed(2));
+            formData.append('payment_method', this.paymentMethod);
+            formData.append('trx_id', this.trxId);
+            formData.append('is_ajax', '1');
+
+            let csrf = '';
+            const csrfEl = document.querySelector('[name=csrfmiddlewaretoken]');
+            if (csrfEl) csrf = csrfEl.value;
+            else {
+                const m = document.cookie.match(/csrftoken=([^;]+)/);
+                if (m) csrf = m[1];
+            }
+            if (csrf) formData.append('csrfmiddlewaretoken', csrf);
+
+            try {
+                const res = await fetch(`/customers/collect-due/${this.selectedCustomer.id}/`, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    }
+                });
+
+                const data = await res.json();
+                if (res.ok && data.status === 'success') {
+                    this.dueSuccessMsg = data.message || 'বাকি টাকা সফলভাবে আদায় হয়েছে!';
+                    setTimeout(() => {
+                        this.collectDueModal = false;
+                        window.location.reload();
+                    }, 800);
+                } else {
+                    this.dueErrorMsg = data.message || 'বাকি আদায় সম্পন্ন করা যায়নি।';
+                }
+            } catch (err) {
+                this.dueErrorMsg = 'সার্ভার যোগাযোগে ত্রুটি হয়েছে। আবার চেষ্টা করুন।';
+            } finally {
+                this.isSubmittingDue = false;
+            }
+        }
+    };
+}
+</script>
 {% endblock %}

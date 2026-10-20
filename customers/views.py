@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from django.db import transaction
 from django.db.models import Count, Q, Sum
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -137,16 +138,21 @@ def add_customer(request):
 
 @tenant_user_required
 @require_POST
+@transaction.atomic
 def collect_due(request, customer_id):
     """
     Collects due payment from a customer, updates Baki balance, creates ledger entry,
     and logs income in Cash Book.
     """
     tenant = getattr(request, "tenant", None)
-    cust_qs = Customer.objects.filter(id=customer_id)
+    cust_qs = Customer.objects.select_for_update().filter(id=customer_id)
     if tenant:
         cust_qs = cust_qs.filter(tenant=tenant)
-    customer = get_object_or_404(cust_qs)
+    customer = cust_qs.first()
+    if not customer:
+        customer = Customer.objects.select_for_update().filter(id=customer_id).first()
+        if not customer:
+            return JsonResponse({"status": "error", "message": "কাস্টমার প্রোফাইল পাওয়া যায়নি।"}, status=404)
     
     amount_str = request.POST.get("amount", "0").strip()
     payment_method = request.POST.get("payment_method", "CASH").upper()
@@ -159,11 +165,28 @@ def collect_due(request, customer_id):
     except Exception:
         amount = Decimal("0.00")
 
+    is_ajax = (
+        request.headers.get("X-Requested-With") == "XMLHttpRequest"
+        or request.POST.get("is_ajax") == "1"
+        or request.headers.get("accept") == "application/json"
+    )
+
     if amount <= 0:
-        return HttpResponse("<div class='p-2 bg-rose-50 text-rose-700 text-xs font-bold rounded'>সঠিক টাকার পরিমাণ দিন!</div>", status=400)
+        err_msg = "অনুগ্রহ করে সঠিক টাকার পরিমাণ দিন!"
+        if is_ajax:
+            return JsonResponse({"status": "error", "message": err_msg}, status=400)
+        messages.error(request, err_msg)
+        return redirect("customers:dashboard")
 
     # Calculate balances
     bal_before = customer.current_due
+    if amount > (bal_before + Decimal("0.01")):
+        err_msg = f"পরিশোধের পরিমাণ (৳{amount}) বর্তমান বকেয়া (৳{bal_before})-এর চেয়ে বেশি হতে পারে না!"
+        if is_ajax:
+            return JsonResponse({"status": "error", "message": err_msg}, status=400)
+        messages.error(request, err_msg)
+        return redirect("customers:dashboard")
+
     bal_after = max(Decimal("0.00"), bal_before - amount)
     customer.current_due = bal_after
     customer.save(update_fields=["current_due", "updated_at"])
@@ -180,7 +203,7 @@ def collect_due(request, customer_id):
 
     # Create Due Ledger Entry
     ledger_entry = DueLedger.objects.create(
-        tenant=tenant,
+        tenant=customer.tenant or tenant,
         customer=customer,
         transaction_type=trx_type,
         amount=amount,
@@ -191,31 +214,38 @@ def collect_due(request, customer_id):
         notes=notes or f"বাকি আদায় ({payment_method})"
     )
 
+    # Recorded user resolution
+    recorded_user = request.user if request.user.is_authenticated else None
+    if not recorded_user:
+        from django.contrib.auth.models import User
+        recorded_user = User.objects.filter(is_superuser=True).first() or User.objects.first()
+
     # Sync to Cash Book / Income Ledger
     due_category = get_or_create_due_collection_category()
     IncomeExpenseEntry.objects.create(
-        tenant=tenant,
-        type="INCOME",
+        tenant=customer.tenant or tenant,
+        entry_type="INCOME",
         category=due_category,
+        title=f"Customer due payment - {customer.name}",
         amount=amount,
         payment_method=payment_method if payment_method in ["CASH", "BKASH", "NAGAD", "ROCKET", "BANK"] else "CASH",
-        reference_no=f"DUE-COLLECT-{ledger_entry.id.hex[:6].upper()}",
-        note=f"বাকি আদায়: {customer.name} ({customer.phone}) | পূর্বের বাকি: ৳{bal_before} | বর্তমান বাকি: ৳{bal_after}",
-        collected_by=collected_by
+        voucher_number=f"DUE-COLLECT-{ledger_entry.id.hex[:6].upper()}",
+        notes=f"Due collected: {customer.name} ({customer.phone}); before ৳{bal_before}; after ৳{bal_after}; collected by {collected_by}",
+        recorded_by=recorded_user,
     )
 
-    if request.headers.get("HX-Request"):
-        return HttpResponse(f"""
-        <div class="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs flex items-center justify-between">
-            <div>
-                <p class="font-bold">৳{amount} টাকা সফলভাবে আদায় হয়েছে!</p>
-                <p class="text-[11px] text-emerald-600">বর্তমান বাকি: ৳{bal_after}</p>
-            </div>
-            <button onclick="window.location.reload()" class="px-2 py-1 bg-emerald-600 text-white rounded font-bold hover:bg-emerald-700">রিলোড</button>
-        </div>
-        """)
+    success_msg = f"'{customer.name}'-এর ৳{amount:.2f} বকেয়া সফলভাবে আদায় হয়েছে!"
 
-    return redirect("customers:statement", customer_id=customer.id)
+    if is_ajax:
+        return JsonResponse({
+            "status": "success",
+            "message": success_msg,
+            "new_due": str(bal_after),
+            "customer_id": str(customer.id),
+        })
+
+    messages.success(request, success_msg)
+    return redirect("customers:dashboard")
 
 @tenant_user_required
 def customer_statement(request, customer_id):

@@ -10,25 +10,63 @@ from typing import Any, Dict, List, Optional, Tuple
 import requests
 from django.conf import settings
 from django.core.cache import cache
+from django.db.models import Q
 
 from inventory.models import BrandDrug
-try:
-    from thefuzz import fuzz, process
-except ImportError:
-    fuzz = None
-    process = None
 
 logger = logging.getLogger(__name__)
 
 AI_CONFIG_PATH = os.path.join(settings.BASE_DIR, "media", "ai_config.json")
+ENV_FILE_PATH = os.path.join(settings.BASE_DIR, ".env")
 CACHE_KEY_AI_CONFIG = "pos:ai_system_config"
 GEMINI_MODELS = [
-    "gemini-2.5-flash",
-    "gemini-flash-latest",
-    "gemini-2.0-flash",
-    "gemini-2.5-flash-lite",
     "gemini-1.5-flash",
+    "gemini-2.0-flash",
+    "gemini-1.5-pro",
 ]
+
+
+def _read_env_gemini_key() -> str:
+    """Dynamically reads GEMINI_API_KEY from .env file if present."""
+    if os.path.exists(ENV_FILE_PATH):
+        try:
+            with open(ENV_FILE_PATH, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith("GEMINI_API_KEY="):
+                        val = line.split("=", 1)[1].strip().strip('"').strip("'")
+                        if val:
+                            return val
+        except Exception:
+            pass
+    return ""
+
+
+def _write_env_gemini_key(api_key: str):
+    """Dynamically persists or clears GEMINI_API_KEY in .env file."""
+    try:
+        lines = []
+        found = False
+        if os.path.exists(ENV_FILE_PATH):
+            with open(ENV_FILE_PATH, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+        new_lines = []
+        target_line = "GEMINI_API_KEY=" + api_key.strip() + chr(10)
+        for line in lines:
+            if line.strip().startswith("GEMINI_API_KEY="):
+                found = True
+                if api_key.strip():
+                    new_lines.append(target_line)
+            else:
+                new_lines.append(line)
+        if not found and api_key.strip():
+            if new_lines and not new_lines[-1].endswith(chr(10)):
+                new_lines.append(chr(10))
+            new_lines.append(target_line)
+        with open(ENV_FILE_PATH, "w", encoding="utf-8") as f:
+            f.writelines(new_lines)
+    except Exception as e:
+        logger.warning("Could not persist GEMINI_API_KEY to .env: %s", e)
 
 
 class GeminiAIService:
@@ -55,7 +93,7 @@ class GeminiAIService:
         }
 
         last_error = ""
-        for model in GEMINI_MODELS[:2]:
+        for model in GEMINI_MODELS:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={clean_key}"
             try:
                 resp = requests.post(url, headers=headers, json=payload, timeout=timeout)
@@ -81,17 +119,18 @@ class GeminiAIService:
 
     @classmethod
     def get_config(cls) -> Dict[str, Any]:
-        """Loads AI config from cache, settings, or media/ai_config.json."""
+        """Loads AI config dynamically from cache, media/ai_config.json, .env, or settings."""
         cached = cache.get(CACHE_KEY_AI_CONFIG)
         if cached is not None and isinstance(cached, dict):
             return cached
 
         config = {
-            "gemini_api_key": getattr(settings, "GEMINI_API_KEY", os.environ.get("GEMINI_API_KEY", "")),
+            "gemini_api_key": "",
             "enabled": True,
-            "preferred_engine": "gemini",  # 'gemini' or 'local'
+            "preferred_engine": "gemini",
         }
 
+        # 1. Check media/ai_config.json
         if os.path.exists(AI_CONFIG_PATH):
             try:
                 with open(AI_CONFIG_PATH, "r", encoding="utf-8") as f:
@@ -101,14 +140,34 @@ class GeminiAIService:
             except Exception as e:
                 logger.warning("Could not read ai_config.json: %s", e)
 
-        cache.set(CACHE_KEY_AI_CONFIG, config, 86400)
+        # 2. Check .env if still empty
+        if not config.get("gemini_api_key"):
+            env_key = _read_env_gemini_key()
+            if env_key:
+                config["gemini_api_key"] = env_key
+
+        # 3. Check os.environ and settings if still empty
+        if not config.get("gemini_api_key"):
+            config["gemini_api_key"] = (
+                os.environ.get("GEMINI_API_KEY", "")
+                or getattr(settings, "GEMINI_API_KEY", "")
+                or ""
+            ).strip()
+
+        cache.set(CACHE_KEY_AI_CONFIG, config, 3600)
         return config
 
     @classmethod
     def save_config(cls, api_key: str, enabled: bool = True, preferred_engine: str = "gemini") -> bool:
-        """Saves updated Gemini config to media/ai_config.json and updates cache."""
+        """Saves updated Gemini config dynamically to media/ai_config.json, .env, and updates cache."""
+        clean_key = api_key.strip()
+        if "..." in clean_key:
+            clean_key = cls.get_api_key()
+        elif clean_key.upper() == "CLEAR":
+            clean_key = ""
+
         config = {
-            "gemini_api_key": api_key.strip(),
+            "gemini_api_key": clean_key,
             "enabled": bool(enabled),
             "preferred_engine": preferred_engine,
         }
@@ -116,8 +175,14 @@ class GeminiAIService:
             os.makedirs(os.path.dirname(AI_CONFIG_PATH), exist_ok=True)
             with open(AI_CONFIG_PATH, "w", encoding="utf-8") as f:
                 json.dump(config, f, indent=2)
+
+            # Update live process memory and .env file
+            if clean_key:
+                os.environ["GEMINI_API_KEY"] = clean_key
+                _write_env_gemini_key(clean_key)
+
             cache.set(CACHE_KEY_AI_CONFIG, config, 86400)
-            logger.info("Successfully updated AI configuration")
+            logger.info("Successfully updated AI configuration dynamically")
             return True
         except Exception as e:
             logger.error("Failed saving AI config: %s", e)
@@ -232,7 +297,8 @@ class GeminiAIService:
                 confidence = float(parsed.get("confidence", 0) or 0)
             except (TypeError, ValueError):
                 confidence = 0
-            if confidence < 0.65:
+            # Medicine identity is safety-sensitive; reject weak visual guesses.
+            if confidence < 0.85:
                 return None
             return parsed
         except Exception as e:
@@ -296,11 +362,15 @@ class GeminiAIService:
         s_form = (gemini_result.get("dosage_form") or "").strip()
         s_strength = (gemini_result.get("strength") or "").strip()
 
-        if not b_name and not g_name:
+        # A generic alone cannot identify a dispensable brand and strength variant.
+        if not b_name:
             return []
 
         # Candidate query: exact, starts_with, contains, or generic
-        query_set = BrandDrug.objects.filter(is_active=True)
+        catalog_scope = Q(tenant__isnull=True)
+        if tenant_key and tenant_key != "default_tenant":
+            catalog_scope |= Q(tenant_id=tenant_key)
+        query_set = BrandDrug.objects.filter(catalog_scope, is_active=True)
         candidates = list(query_set.filter(brand_name__iexact=b_name))
         if not candidates:
             candidates = list(query_set.filter(brand_name__istartswith=b_name))
@@ -310,27 +380,18 @@ class GeminiAIService:
             if len(first_word) >= 3:
                 candidates = list(query_set.filter(brand_name__icontains=first_word))
 
-        if not candidates and b_name:
-            # Fuzzy match against distinct active brand names
-            cache_key = "pos:all_active_brands_fuzzy_cache"
-            distinct_brands = cache.get(cache_key)
-            if not distinct_brands:
-                distinct_brands = list(query_set.values_list("brand_name", flat=True).distinct())
-                cache.set(cache_key, distinct_brands, 3600)
-            best_match = process.extractOne(b_name, distinct_brands, scorer=fuzz.token_set_ratio)
-            if best_match and best_match[1] >= 75:
-                candidates = list(query_set.filter(brand_name=best_match[0]))
-
-        if not candidates and g_name:
-            first_gen = g_name.split("+")[0].strip()
-            if len(first_gen) >= 4:
-                candidates = list(query_set.filter(generic__name__icontains=first_gen)[:10])
-
         if not candidates:
             return []
 
         ranked_items = []
         for drug in candidates:
+            vision_strength_numbers = set(re.findall(r"\d+(?:\.\d+)?", s_strength))
+            catalog_strength_numbers = set(re.findall(r"\d+(?:\.\d+)?", drug.strength or ""))
+            if vision_strength_numbers and catalog_strength_numbers and not (
+                vision_strength_numbers & catalog_strength_numbers
+            ):
+                continue
+
             score = 50.0
 
             # Brand name comparison

@@ -19,6 +19,7 @@ if hasattr(sys.stdout, "reconfigure"):
 
 import logging
 import re
+import shutil
 from typing import Any
 
 try:
@@ -41,9 +42,11 @@ except ImportError:
     fuzz = None
     process = None
 from django.core.cache import cache
-from django.http import JsonResponse
+from django.db.models import Q, Sum
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
+from core.decorators import tenant_user_required
 
 from inventory.models import BrandDrug
 from pos.gemini_service import GeminiAIService
@@ -54,9 +57,12 @@ logger = logging.getLogger(__name__)
 
 # Auto-configure Tesseract binary on Linux server if static binary is present
 STATIC_TESS_BIN = "/home/webkoders/.local/bin/tesseract"
-if os.path.exists(STATIC_TESS_BIN):
+WINDOWS_TESS_BIN = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+if pytesseract is not None and os.path.exists(STATIC_TESS_BIN):
     pytesseract.pytesseract.tesseract_cmd = STATIC_TESS_BIN
     os.environ["TESSDATA_PREFIX"] = "/home/webkoders/tessdata"
+elif pytesseract is not None and os.path.exists(WINDOWS_TESS_BIN):
+    pytesseract.pytesseract.tesseract_cmd = WINDOWS_TESS_BIN
 
 STOP_WORDS = {
     "mfg", "lic", "dar", "no", "exp", "batch", "date", "mrp", "tk", "bdt",
@@ -79,6 +85,34 @@ def _safe_partial_ratio(s1: str, s2: str) -> int:
     return int(difflib.SequenceMatcher(None, s1.lower(), s2.lower()).ratio() * 100)
 
 
+def _tesseract_available() -> bool:
+    if pytesseract is None:
+        return False
+    command = str(getattr(pytesseract.pytesseract, "tesseract_cmd", "tesseract"))
+    return os.path.isfile(command) if os.path.dirname(command) else shutil.which(command) is not None
+
+
+def _read_large_text(image, config: str) -> str:
+    """Keep prominent, confident text and discard packaging fine print."""
+    data = pytesseract.image_to_data(
+        image, config=config, output_type=pytesseract.Output.DICT
+    )
+    min_height = max(14, round(image.shape[0] * 0.008))
+    lines = {}
+    for i, word in enumerate(data.get("text", [])):
+        word = word.strip()
+        try:
+            height = int(data["height"][i])
+            confidence = float(data["conf"][i])
+        except (KeyError, ValueError, TypeError):
+            continue
+        if not word or height < min_height or confidence < 15:
+            continue
+        key = (data["block_num"][i], data["par_num"][i], data["line_num"][i])
+        lines.setdefault(key, []).append(word)
+    return "\n".join(" ".join(words) for words in lines.values())
+
+
 def rank_drugs_with_multi_signal(clean_text: str, all_drugs: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """
     Intelligent Multi-Signal Drug Ranking Algorithm:
@@ -88,13 +122,35 @@ def rank_drugs_with_multi_signal(clean_text: str, all_drugs: list[dict[str, Any]
     - Strength & Dosage form disambiguation (e.g. Chewable Tablet vs Suspension).
     """
     ocr_lower = clean_text.lower()
-    ocr_tokens = set(re.findall(r"[a-zA-Z0-9]+", ocr_lower))
+    # Split mixed OCR tokens such as "500mg" into words and numbers. Matching
+    # only whole tokens avoids false hits such as 500 matching 1500, or a brand
+    # matching a substring inside a manufacturer name.
+    ocr_tokens = set(re.findall(r"[a-z]+|\d+", ocr_lower))
+    ocr_strength_numbers = {
+        number
+        for number, _unit in re.findall(
+            r"\b(\d+(?:\.\d+)?)\s*(mg|mcg|µg|ml|gm|g|iu)\b", ocr_lower
+        )
+    }
+    exact_candidates = []
+    for drug in all_drugs:
+        # Digits in OCR often come from package strengths, not the brand. Never
+        # use a numeric brand suffix like #40 or #120 as identity evidence.
+        name_tokens = re.findall(r"[a-z]+", (drug.get("brand_name") or "").lower())
+        if any(token in ocr_tokens for token in name_tokens if len(token) >= 4):
+            exact_candidates.append(drug)
+
+    # Fuzzy matching across every product is expensive and prone to false
+    # positives. Exact OCR token hits form the fast candidate shortlist; if no
+    # brand token survived OCR, return no local guess and let vision fallback run.
+    if not exact_candidates:
+        return []
     scored_candidates = []
 
-    for d in all_drugs:
+    for d in exact_candidates:
         b_name = d["brand_name"]
         b_lower = b_name.lower().strip()
-        b_tokens = [t for t in re.findall(r"[a-zA-Z0-9]+", b_lower) if len(t) >= 2]
+        b_tokens = [t for t in re.findall(r"[a-z]+", b_lower) if len(t) >= 4]
         if not b_tokens:
             continue
 
@@ -109,13 +165,20 @@ def rank_drugs_with_multi_signal(clean_text: str, all_drugs: list[dict[str, Any]
                     exact_token_matches += 1
                     matched_tokens += 1
             else:
-                if tok in ocr_tokens or tok in ocr_lower:
+                if tok in ocr_tokens:
                     matched_tokens += 1
                     exact_token_matches += 1
-                elif _safe_partial_ratio(tok, ocr_lower) >= 85:
-                    matched_tokens += 0.85
 
         if matched_tokens == 0:
+            continue
+
+        # If the label clearly shows a strength, do not return another strength
+        # variant of the same brand (for example Renova 500 mg for a 120 mg/5 ml bottle).
+        drug_strength = (d.get("strength") or "").lower()
+        drug_strength_numbers = set(re.findall(r"\d+(?:\.\d+)?", drug_strength))
+        if ocr_strength_numbers and drug_strength_numbers and not (
+            ocr_strength_numbers & drug_strength_numbers
+        ):
             continue
 
         brand_ratio = matched_tokens / len(b_tokens)
@@ -128,10 +191,8 @@ def rank_drugs_with_multi_signal(clean_text: str, all_drugs: list[dict[str, Any]
             for gen_part in re.findall(r"[a-zA-Z]{4,}", gen_name):
                 if gen_part in ("acid", "sodium", "potassium", "chloride", "hydrochloride", "hydrate", "oral", "tablet"):
                     continue
-                if gen_part in ocr_tokens or gen_part in ocr_lower:
+                if gen_part in ocr_tokens:
                     gen_score += 15
-                elif _safe_partial_ratio(gen_part, ocr_lower) >= 85:
-                    gen_score += 10
         gen_score = min(35, gen_score)
 
         # 3. Strength Score (0-20)
@@ -140,7 +201,7 @@ def rank_drugs_with_multi_signal(clean_text: str, all_drugs: list[dict[str, Any]
         if str_val:
             str_nums = re.findall(r"\d+", str_val)
             for num in str_nums:
-                if int(num) > 5 and (num in ocr_tokens or num in ocr_lower):
+                if int(num) > 5 and num in ocr_tokens:
                     str_score += 8
         str_score = min(20, str_score)
 
@@ -149,10 +210,8 @@ def rank_drugs_with_multi_signal(clean_text: str, all_drugs: list[dict[str, Any]
         form_val = (d.get("dosage_form__name") or "").lower()
         if form_val:
             for f_w in re.findall(r"[a-zA-Z]{4,}", form_val):
-                if f_w in ocr_tokens or f_w in ocr_lower:
+                if f_w in ocr_tokens:
                     form_score += 8
-                elif _safe_partial_ratio(f_w, ocr_lower) >= 85:
-                    form_score += 5
         form_score = min(15, form_score)
 
         # 5. Combination Boost for Multi-token Brands
@@ -161,8 +220,19 @@ def rank_drugs_with_multi_signal(clean_text: str, all_drugs: list[dict[str, Any]
             if gen_score >= 15 or str_score >= 8:
                 combo_boost = 25
 
-        # Suppress noise for short names if no supporting chemical/strength matches
-        if is_short_brand and (gen_score == 0 and str_score == 0):
+        # A single OCR token is weak evidence for a one-word brand (e.g. a
+        # noisy read of "Metro" must not suggest an unrelated product). Require
+        # a matching ingredient or strength before presenting that candidate.
+        if len(b_tokens) == 1 and gen_score == 0 and str_score == 0:
+            continue
+
+        # For a multi-word brand, partial brand evidence also needs clinical
+        # corroboration from the printed ingredient or strength.
+        if len(b_tokens) > 1 and brand_ratio < 1 and gen_score == 0 and str_score == 0:
+            continue
+
+        # Suppress short noisy names unless there is supporting package text.
+        if is_short_brand and gen_score == 0 and str_score == 0:
             continue
 
         total_score = brand_score + gen_score + str_score + form_score + combo_boost
@@ -173,14 +243,61 @@ def rank_drugs_with_multi_signal(clean_text: str, all_drugs: list[dict[str, Any]
             item_copy["dosage_form"] = item_copy.get("dosage_form__short_name") or item_copy.get("dosage_form__name") or "Tab"
             item_copy["generic_name"] = item_copy.get("generic__name") or "N/A"
             item_copy["manufacturer"] = item_copy.get("manufacturer__name") or "N/A"
-            item_copy["score"] = round(total_score, 1)
+            item_copy["score"] = min(100, round(total_score, 1))
+            item_copy["_rank_score"] = total_score
             item_copy["ai_engine"] = "local"
             scored_candidates.append(item_copy)
 
-    scored_candidates.sort(key=lambda x: x["score"], reverse=True)
+    scored_candidates.sort(key=lambda x: x["_rank_score"], reverse=True)
+    if scored_candidates:
+        # Keep the result list focused on close matches to the strongest
+        # brand/strength evidence instead of filling it with shared-word noise.
+        best_score = scored_candidates[0]["_rank_score"]
+        scored_candidates = [item for item in scored_candidates if item["_rank_score"] >= best_score - 25]
+    for item in scored_candidates:
+        item.pop("_rank_score", None)
     return scored_candidates
 
 
+def _gemini_scan_response(request, raw_bytes: bytes):
+    """Return a confident AI match, or None so the local OCR result can be used."""
+    if not GeminiAIService.is_gemini_active():
+        return None
+    try:
+        result = GeminiAIService.analyze_medicine_image(raw_bytes)
+        if not result or not (result.get("brand_name") or result.get("generic_name")):
+            return None
+        matches = GeminiAIService.match_drug_from_gemini(result)
+
+        primary_brand = (result.get("brand_name") or "").strip()
+        if matches:
+            primary_brand = matches[0]["brand_name"]
+
+        raw_summary = f"{result.get('brand_name', '')} {result.get('strength', '')} ({result.get('dosage_form', '')}) - {result.get('generic_name', '')} [{result.get('manufacturer', '')}]".strip()
+        if request.headers.get("HX-Request") and request.POST.get("format") != "json":
+            return render(request, "pos/partials/camera_scan_results.html", {
+                "detected_drugs": matches[:6] if matches else [],
+                "primary_brand_name": primary_brand,
+                "gemini_result": result,
+                "raw_text": raw_summary,
+                "ai_engine": "gemini",
+            })
+        return JsonResponse({
+            "status": "success",
+            "medicine": matches[0] if matches else None,
+            "primary_brand_name": primary_brand,
+            "gemini_result": result,
+            "score": matches[0]["score"] if matches else 95,
+            "raw_text": raw_summary,
+            "results": matches[:6] if matches else [],
+            "ai_engine": "gemini",
+        })
+    except Exception as err:
+        logger.warning("Gemini Vision processing error: %s", err)
+        return None
+
+
+@tenant_user_required
 @csrf_exempt
 def scan_medicine_ocr(request):
     """
@@ -199,6 +316,18 @@ def scan_medicine_ocr(request):
 
     if not image_file and not image_data:
         return JsonResponse({"status": "failed", "message": "ছবি পাওয়া যায়নি"})
+
+
+    # Guard optional imports so a missing local OCR dependency returns a useful
+    # setup error instead of a NoneType.frombuffer traceback.
+    if cv2 is None or np is None or pytesseract is None or not _tesseract_available():
+        message = "Local OCR needs NumPy, OpenCV, pytesseract, and the Tesseract OCR engine. Install the Python requirements and the Tesseract engine, then retry."
+        if request.headers.get("HX-Request") and request.POST.get("format") != "json":
+            return HttpResponse(
+                f'<div class="p-4 text-center text-rose-700 bg-rose-50 rounded-xl">{message}</div>',
+                status=503,
+            )
+        return JsonResponse({"status": "failed", "message": message}, status=503)
 
     try:
         raw_bytes = None
@@ -226,55 +355,8 @@ def scan_medicine_ocr(request):
         if encoded:
             raw_bytes = buffer.tobytes()
 
-        # ============================================================== 
-        # PRIORITY 1: Google Gemini Flash Vision Multimodal Engine
         # ==============================================================
-        if GeminiAIService.is_gemini_active():
-            try:
-                gemini_res = GeminiAIService.analyze_medicine_image(raw_bytes)
-                if gemini_res and (gemini_res.get("brand_name") or gemini_res.get("generic_name")):
-                    gemini_matches = GeminiAIService.match_drug_from_gemini(gemini_res)
-                    if gemini_matches:
-                        primary_brand = gemini_matches[0]["brand_name"]
-                        raw_summary = f"{gemini_res.get('brand_name', '')} {gemini_res.get('strength', '')} ({gemini_res.get('dosage_form', '')})".strip()
-                        if request.headers.get("HX-Request") and request.POST.get("format") != "json":
-                            return render(request, "pos/partials/camera_scan_results.html", {
-                                "detected_drugs": gemini_matches[:6],
-                                "primary_brand_name": primary_brand,
-                                "raw_text": raw_summary,
-                                "ai_engine": "gemini",
-                            })
-                        return JsonResponse({
-                            "status": "success",
-                            "medicine": gemini_matches[0],
-                            "primary_brand_name": primary_brand,
-                            "score": gemini_matches[0]["score"],
-                            "raw_text": raw_summary,
-                            "results": gemini_matches[:6],
-                            "ai_engine": "gemini",
-                        })
-                    elif gemini_res.get("brand_name"):
-                        primary_brand = gemini_res.get("brand_name").strip()
-                        raw_summary = f"{primary_brand} {gemini_res.get('strength', '')} ({gemini_res.get('dosage_form', '')})".strip()
-                        if request.headers.get("HX-Request") and request.POST.get("format") != "json":
-                            return render(request, "pos/partials/camera_scan_results.html", {
-                                "detected_drugs": [],
-                                "primary_brand_name": primary_brand,
-                                "raw_text": raw_summary,
-                                "ai_engine": "gemini",
-                            })
-                        return JsonResponse({
-                            "status": "partial",
-                            "primary_brand_name": primary_brand,
-                            "raw_text": raw_summary,
-                            "results": [],
-                            "ai_engine": "gemini",
-                        })
-            except Exception as gemini_err:
-                logger.warning("Gemini Vision processing error: %s", gemini_err)
-
-        # ==============================================================
-        # PRIORITY 2: Local Enhanced Multi-Pass OCR Pipeline
+        # PRIORITY 1: Local Enhanced Multi-Pass OCR Pipeline
         # (Proven accurate on foil strips, bottles, and packaging)
         # ==============================================================
         img_resized = cv2.resize(img, None, fx=2.0, fy=2.0, interpolation=cv2.INTER_CUBIC)
@@ -282,7 +364,7 @@ def scan_medicine_ocr(request):
 
         # Pass 1: Raw color image with --psm 3
         try:
-            extracted_text = pytesseract.image_to_string(img_resized, config='--psm 3 -l eng')
+            extracted_text = _read_large_text(img_resized, config='--psm 3 -l eng')
         except Exception as e1:
             logger.debug("Tesseract PSM 3 failed: %s", e1)
 
@@ -290,7 +372,7 @@ def scan_medicine_ocr(request):
         if not extracted_text.strip():
             try:
                 gray = cv2.cvtColor(img_resized, cv2.COLOR_BGR2GRAY)
-                extracted_text = pytesseract.image_to_string(gray, config='--psm 11 -l eng')
+                extracted_text = _read_large_text(gray, config='--psm 11 -l eng')
             except Exception as e2:
                 logger.debug("Tesseract PSM 11 grayscale failed: %s", e2)
 
@@ -306,25 +388,22 @@ def scan_medicine_ocr(request):
                 )
                 if np.mean(thresh) < 127:
                     thresh = cv2.bitwise_not(thresh)
-                extracted_text = pytesseract.image_to_string(thresh, config='--psm 11 -l eng')
+                extracted_text = _read_large_text(thresh, config='--psm 11 -l eng')
             except Exception as e3:
                 logger.debug("Tesseract threshold preprocessing failed: %s", e3)
 
-        # Pass 4: EasyOCR deep learning model (fallback)
-        if not extracted_text.strip():
-            try:
-                reader = get_easyocr_reader()
-                if reader:
-                    easy_res = reader.readtext(img_resized, detail=0)
-                    extracted_text = " ".join(easy_res)
-            except Exception as e4:
-                logger.debug("EasyOCR fallback failed: %s", e4)
+        # Avoid initializing EasyOCR inside a cashier request: its first model
+        # load can take much longer than the scan itself. Empty/weak local reads
+        # go to the bounded Gemini fallback below.
 
         clean_text = extracted_text.strip()
         safe_log_text = clean_text.encode('ascii', errors='backslashreplace').decode('ascii')
         logger.info("Local OCR Extracted Text: %s", safe_log_text)
 
         if not clean_text:
+            gemini_response = _gemini_scan_response(request, raw_bytes)
+            if gemini_response is not None:
+                return gemini_response
             if request.headers.get("HX-Request") and request.POST.get("format") != "json":
                 return render(request, "pos/partials/camera_scan_results.html", {
                     "detected_drugs": [],
@@ -338,10 +417,13 @@ def scan_medicine_ocr(request):
             })
 
         # Load active medicines from cache for fast access
-        cache_key_meds = "pos:all_active_drugs_ocr_cache"
+        tenant = getattr(request, "tenant", None)
+        tenant_key = str(tenant.id) if tenant else "default_tenant"
+        cache_key_meds = f"pos:all_active_drugs_ocr_cache:{tenant_key}"
         medicines = cache.get(cache_key_meds)
         if not medicines:
-            medicines = list(BrandDrug.objects.filter(is_active=True).values(
+            catalog_scope = Q(tenant__isnull=True) | Q(tenant=tenant)
+            medicines = list(BrandDrug.objects.filter(catalog_scope, is_active=True).values(
                 'id', 'brand_name', 'unit_mrp', 'strength',
                 'dosage_form__name', 'dosage_form__short_name',
                 'generic__name', 'manufacturer__name'
@@ -350,10 +432,10 @@ def scan_medicine_ocr(request):
 
         # Check User Training / Custom Nicknames
         matched_items = []
-        trained_brand = DrugTrainingService.find_match(clean_text)
+        trained_brand = DrugTrainingService.find_match(clean_text, tenant_key)
         if not trained_brand:
             for l in clean_text.split('\n'):
-                t_match = DrugTrainingService.find_match(l)
+                t_match = DrugTrainingService.find_match(l, tenant_key)
                 if t_match:
                     trained_brand = t_match
                     break
@@ -373,6 +455,46 @@ def scan_medicine_ocr(request):
 
         # Multi-signal intelligent scoring (full accurate ranking)
         ranked_local = rank_drugs_with_multi_signal(clean_text, medicines)
+
+        # Only spend time on alternate preprocessing when the fast first OCR
+        # pass found no catalog candidate. This recovers labels where grayscale
+        # or contrast cleanup reads the brand more clearly without slowing
+        # scans that already have a strong exact match.
+        if not ranked_local:
+            alternate_texts = []
+            try:
+                gray = cv2.cvtColor(img_resized, cv2.COLOR_BGR2GRAY)
+                gray_text = _read_large_text(gray, config='--psm 11 -l eng').strip()
+                if gray_text:
+                    alternate_texts.append(gray_text)
+                    ranked_local = rank_drugs_with_multi_signal(gray_text, medicines)
+            except Exception as err:
+                logger.debug("Tesseract grayscale retry failed: %s", err)
+
+            if not ranked_local:
+                try:
+                    _, _, r_channel = cv2.split(img_resized)
+                    clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+                    contrast_red = clahe.apply(r_channel)
+                    denoised = cv2.medianBlur(contrast_red, 3)
+                    thresh = cv2.adaptiveThreshold(
+                        denoised, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                        cv2.THRESH_BINARY, 21, 10
+                    )
+                    if np.mean(thresh) < 127:
+                        thresh = cv2.bitwise_not(thresh)
+                    threshold_text = _read_large_text(
+                        thresh, config='--psm 11 -l eng'
+                    ).strip()
+                    if threshold_text:
+                        alternate_texts.append(threshold_text)
+                        ranked_local = rank_drugs_with_multi_signal(threshold_text, medicines)
+                except Exception as err:
+                    logger.debug("Tesseract threshold retry failed: %s", err)
+
+            if alternate_texts:
+                clean_text = "\n".join([clean_text, *alternate_texts]).strip()
+
         for rk in ranked_local:
             if not any(it['id'] == rk['id'] for it in matched_items):
                 matched_items.append(rk)
@@ -382,13 +504,14 @@ def scan_medicine_ocr(request):
         top_candidates = matched_items[:6]
         top_ids = [it['id'] for it in top_candidates]
         if top_ids:
-            drug_objs = list(BrandDrug.objects.filter(id__in=top_ids).prefetch_related('batches'))
+            drug_objs = list(BrandDrug.objects.filter(Q(tenant__isnull=True) | Q(tenant=tenant), id__in=top_ids).prefetch_related('batches'))
             drug_map = {d.id: d for d in drug_objs}
             for it in top_candidates:
                 d_obj = drug_map.get(it['id'])
                 if d_obj:
-                    fefo = d_obj.batches.fefo().first() or d_obj.batches.order_by("-expiry_date").first()
-                    it['total_stock'] = d_obj.total_stock
+                    tenant_batches = d_obj.batches.filter(tenant=tenant)
+                    fefo = tenant_batches.fefo().first() or tenant_batches.order_by("-expiry_date").first()
+                    it['total_stock'] = tenant_batches.aggregate(total=Sum("current_stock"))["total"] or 0
                     it['fefo_batch'] = {
                         "id": str(fefo.id) if fefo else None,
                         "batch_number": fefo.batch_number if fefo else "N/A",
@@ -396,6 +519,13 @@ def scan_medicine_ocr(request):
                         "stock": fefo.current_stock if fefo else 0,
                     } if fefo else None
                     top_drugs.append(it)
+
+        # Strong local matches return without a network round-trip. Ask vision
+        # only when local OCR found no match or the text evidence is ambiguous.
+        if not top_drugs or top_drugs[0].get("score", 0) < 75:
+            gemini_response = _gemini_scan_response(request, raw_bytes)
+            if gemini_response is not None:
+                return gemini_response
 
         # HTMX partial response
         primary_brand = top_drugs[0]["brand_name"] if top_drugs else ""

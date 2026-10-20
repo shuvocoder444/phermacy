@@ -55,8 +55,9 @@
                     </a>
                     {% if c.current_due > 0 %}
                     <button 
-                        @click="selectedCustomer = { id: '{{ c.id }}', name: '{{ c.name|escapejs }}', phone: '{{ c.phone }}', current_due: '{{ c.current_due }}' }; collectDueModal = true;"
-                        class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-[11px] shadow-sm transition-colors flex items-center gap-1"
+                        type="button"
+                        @click="openCollectModal({ id: '{{ c.id }}', name: '{{ c.name|escapejs }}', phone: '{{ c.phone }}', current_due: '{{ c.current_due }}' })"
+                        class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-[11px] shadow-sm transition-colors flex items-center gap-1 active:scale-95"
                     >
                         <span>বাকি আদায়</span>
                     </button>

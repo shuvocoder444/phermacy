@@ -719,7 +719,7 @@ def train_medicine_alias_view(request):
     return JsonResponse({"status": "failed", "message": "সংরক্ষণ করা যায়নি।"}, status=500)
 
 
-@super_admin_required
+@tenant_user_required
 @csrf_exempt
 def ai_config_view(request):
     """
@@ -756,7 +756,7 @@ def ai_config_view(request):
     })
 
 
-@super_admin_required
+@tenant_user_required
 @csrf_exempt
 @require_POST
 def test_gemini_connection_view(request):
