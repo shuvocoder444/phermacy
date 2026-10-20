@@ -4,9 +4,9 @@
             <tr class="bg-slate-50 border-b border-slate-200 text-slate-600 font-extrabold uppercase tracking-wider text-[11px]">
                 <th class="py-3 px-4">ঔষধ ও জেনেরিক</th>
                 <th class="py-3 px-3">ব্যাচ নম্বর</th>
-                <th class="py-3 px-3">মেয়াদ (FEFO)</th>
-                <th class="py-3 px-3 text-right">ক্রয়মূল্য (TP)</th>
-                <th class="py-3 px-3 text-right">বিক্রয়মূল্য (MRP)</th>
+                <th class="py-3 px-3">মেয়াদ (FEFO)</th>
+                <th class="py-3 px-3 text-right">ক্রয়মূল্য (TP)</th>
+                <th class="py-3 px-3 text-right">বিক্রয়মূল্য (MRP)</th>
                 <th class="py-3 px-3 text-center">মজুদ স্টক</th>
                 <th class="py-3 px-4 text-right">স্টক ভ্যালু (MRP)</th>
             </tr>
@@ -45,7 +45,7 @@
                     <div class="font-mono text-slate-800">{{ batch.expiry_date|date:"d M Y" }}</div>
                     {% if batch.expiry_date <= today %}
                     <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700 border border-rose-200">
-                        ❌ মেয়াদোত্তীর্ণ
+                        ❌ মেয়াদোত্তীর্ণ
                     </span>
                     {% elif batch.expiry_date <= expiry_60_days %}
                     <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
@@ -94,7 +94,7 @@
             <tr>
                 <td colspan="7" class="py-12 text-center text-slate-400">
                     <div class="text-3xl mb-2">🔍</div>
-                    <p class="font-bold text-slate-600">কোনো ঔষধের স্টক পাওয়া যায়নি</p>
+                    <p class="font-bold text-slate-600">কোনো ঔষধের স্টক পাওয়া যায়নি</p>
                     <p class="text-xs">ফিল্টার পরিবর্তন করুন অথবা 'নতুন ব্যাচ / স্টক ইন' বাটনে ক্লিক করে স্টক যুক্ত করুন।</p>
                 </td>
             </tr>

@@ -55,6 +55,7 @@
 
     <!-- Store Header -->
     <div class="text-center">
+        {% if store_logo %}<img src="{{ store_logo }}" alt="{{ store_name }}" style="display:block;max-width:34mm;max-height:18mm;object-fit:contain;margin:0 auto 4px">{% endif %}
         <div class="store-title">{{ store_name }}</div>
         <div>{{ store_address }}</div>
         <div>মোবাইল: {{ store_phone }}</div>
@@ -65,9 +66,9 @@
 
     <!-- Invoice Meta -->
     <div>
-        <div><strong>ইনভয়েস নং:</strong> {{ invoice.invoice_number }}</div>
+        <div><strong>ইনভয়েস নং:</strong> {{ invoice.invoice_number }}</div>
         <div><strong>তারিখ:</strong> {{ invoice.created_at|date:"d/m/Y h:i A" }}</div>
-        <div><strong>ক্যাশিয়ার:</strong> {{ invoice.cashier.username }}</div>
+        <div><strong>ক্যাশিয়ার:</strong> {{ invoice.cashier.username }}</div>
         <div><strong>গ্রাহক:</strong> {{ invoice.customer_name_walkin }} {% if invoice.customer_phone_walkin %}({{ invoice.customer_phone_walkin }}){% endif %}</div>
         {% if invoice.doctor_name %}<div><strong>ডাক্তার:</strong> {{ invoice.doctor_name }}</div>{% endif %}
     </div>
@@ -129,7 +130,7 @@
         </tr>
         {% if invoice.due_amount > 0 %}
         <tr style="font-size: 12px; font-weight: bold;">
-            <td class="text-left">বকেয়া (Due / Baki):</td>
+            <td class="text-left">বকেয়া (Due / Baki):</td>
             <td class="text-right">৳{{ invoice.due_amount }}</td>
         </tr>
         {% endif %}
@@ -146,7 +147,7 @@
     <!-- Footer Notes -->
     <div class="text-center" style="font-size: 10px; margin-top: 6px;">
         <div>সুস্থ থাকুন, ভালো থাকুন।</div>
-        <div>ক্যাশমেমো ছাড়া ওষুধ ফেরত নেওয়া হয় না।</div>
+        <div>ক্যাশমেমো ছাড়া ওষুধ ফেরত নেওয়া হয় না।</div>
         <div style="margin-top: 4px;">Powered by PharmaFlow SaaS BD</div>
     </div>
 

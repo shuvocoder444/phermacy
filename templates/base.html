@@ -2,7 +2,7 @@
 <html lang="bn" class="h-full bg-slate-50 text-slate-800">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
@@ -11,11 +11,11 @@
     <meta name="apple-mobile-web-app-title" content="PharmaFlow">
     <meta name="theme-color" content="#ffffff">
     <title>{% block title %}PharmaFlow SaaS - Bangladesh Retail Pharmacy POS{% endblock %}</title>
-    
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Bengali:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
@@ -32,11 +32,19 @@
             }
         }
     </script>
-    
+
     <style>
         [x-cloak] { display: none !important; }
         body { font-family: 'Inter', 'Noto Sans Bengali', sans-serif; }
         html, body { -webkit-overflow-scrolling: touch; }
+        html { min-height: 100%; }
+        body { min-width: 320px; max-width: 100%; overflow-x: hidden; }
+        *, *::before, *::after { box-sizing: border-box; }
+        img, video, canvas, svg { max-width: 100%; }
+        input, select, textarea, button { min-width: 0; max-width: 100%; }
+        .h-screen { height: 100vh; height: 100dvh; }
+        .pos-terminal { height: 100vh; height: 100dvh; min-height: 0; overflow: hidden; }
+        .overflow-x-auto { overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
         ::-webkit-scrollbar { width: 5px; height: 5px; }
         ::-webkit-scrollbar-track { background: #f8fafc; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
@@ -45,17 +53,24 @@
         .htmx-indicator { display: none; }
         .htmx-request .htmx-indicator { display: inline-block; }
         .htmx-request.htmx-indicator { display: inline-block; }
+        @media (max-width: 767px) {
+            .pos-mobile-bottom-bar { padding-bottom: calc(.75rem + env(safe-area-inset-bottom)); }
+            input, select, textarea { font-size: 16px !important; }
+        }
+        @media (max-width: 360px) {
+            .pos-terminal .mobile-optional-action { display: none; }
+        }
     </style>
 </head>
 <body class="h-full flex flex-col antialiased">
-    
+
     <!-- HTMX CSRF Token Config -->
     <script>
         document.body.addEventListener('htmx:configRequest', (event) => {
             event.detail.headers['X-CSRFToken'] = '{{ csrf_token }}';
         });
     </script>
-    
+
     <!-- Navbar block if needed -->
     {% block navbar %}{% endblock %}
 
@@ -64,7 +79,7 @@
 
     <!-- Global scripts -->
     {% block extra_scripts %}{% endblock %}
-    
+
     <script>
     // Native mobile pull-to-refresh is enabled via standard browser behavior
     </script>

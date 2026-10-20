@@ -1,7 +1,8 @@
-<div class="p-5 sm:p-6 bg-white overflow-y-auto max-h-[88vh] pb-safe" x-data="{
+<div class="p-5 sm:p-6 bg-white overflow-y-auto max-h-[88dvh] pb-safe" x-data="{
     paymentMethod: 'CASH',
     totalPayable: {{ cart.total_payable }},
     paidAmount: {{ cart.total_payable }},
+    submitting: false,
     get changeAmount() {
         let paid = parseFloat(this.paidAmount) || 0;
         let diff = paid - this.totalPayable;
@@ -35,85 +36,25 @@
         hx-post="{% url 'pos:checkout_submit' %}" 
         hx-target="#checkout-modal-content" 
         hx-swap="innerHTML"
+        hx-sync="this:drop"
+        hx-disabled-elt="find button[type='submit']"
+        @submit="submitting = true"
         class="mt-4 sm:mt-5 space-y-3 sm:space-y-4">
         {% csrf_token %}
         
-        <!-- Customer & Due Details -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 bg-slate-50 p-3 sm:p-4 rounded-2xl border border-slate-200">
-            <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1">কাস্টমার ফোন (বাকি / SMS)</label>
-                <input 
-                    type="text" 
-                    name="customer_phone" 
-                    value="{{ customer.phone|default:cart.customer_phone }}"
-                    placeholder="017xxxxxxxx"
-                    class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-800 font-mono font-bold focus:border-emerald-500 focus:outline-none shadow-sm">
-            </div>
-            <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1">কাস্টমার নাম</label>
-                <input 
-                    type="text" 
-                    name="customer_name" 
-                    value="{{ customer.name|default:cart.customer_name }}"
-                    placeholder="Walk-in Customer"
-                    class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-800 font-medium focus:border-emerald-500 focus:outline-none shadow-sm">
-            </div>
+        <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200">
+            <label class="block text-xs font-bold text-slate-700 mb-1">?????????? ??? (??????)</label>
+            <input
+                type="text"
+                name="customer_name"
+                value="{{ cart.customer_name }}"
+                placeholder="Walk-in Customer"
+                class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-800 font-medium focus:border-emerald-500 focus:outline-none shadow-sm">
         </div>
 
-        <!-- Payment Method Selection -->
-        <div>
-            <label class="block text-xs font-bold text-slate-700 mb-1.5">পেমেন্ট মাধ্যম বেছে নিন</label>
-            <div class="grid grid-cols-3 sm:grid-cols-5 gap-2">
-                <button 
-                    type="button" 
-                    @click="paymentMethod = 'CASH'; paidAmount = totalPayable"
-                    :class="paymentMethod === 'CASH' ? 'bg-emerald-600 text-white border-emerald-600 ring-2 ring-emerald-400' : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'"
-                    class="p-2 sm:p-3 rounded-2xl border text-xs font-bold text-center transition-all shadow-sm active:scale-95 cursor-pointer">
-                    💵 ক্যাশ
-                </button>
-                <button 
-                    type="button" 
-                    @click="paymentMethod = 'BKASH'; paidAmount = totalPayable"
-                    :class="paymentMethod === 'BKASH' ? 'bg-[#D12053] text-white border-pink-500 ring-2 ring-pink-400' : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'"
-                    class="p-2 sm:p-3 rounded-2xl border text-xs font-bold text-center transition-all shadow-sm active:scale-95 cursor-pointer">
-                    bKash
-                </button>
-                <button 
-                    type="button" 
-                    @click="paymentMethod = 'NAGAD'; paidAmount = totalPayable"
-                    :class="paymentMethod === 'NAGAD' ? 'bg-[#F7931E] text-white border-amber-500 ring-2 ring-amber-400' : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'"
-                    class="p-2 sm:p-3 rounded-2xl border text-xs font-bold text-center transition-all shadow-sm active:scale-95 cursor-pointer">
-                    Nagad
-                </button>
-                <button 
-                    type="button" 
-                    @click="paymentMethod = 'ROCKET'; paidAmount = totalPayable"
-                    :class="paymentMethod === 'ROCKET' ? 'bg-[#8B1A8B] text-white border-purple-500 ring-2 ring-purple-400' : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'"
-                    class="p-2 sm:p-3 rounded-2xl border text-xs font-bold text-center transition-all shadow-sm active:scale-95 cursor-pointer">
-                    Rocket
-                </button>
-                <button 
-                    type="button" 
-                    @click="paymentMethod = 'DUE'; paidAmount = 0"
-                    :class="paymentMethod === 'DUE' ? 'bg-rose-600 text-white border-rose-600 ring-2 ring-rose-400' : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'"
-                    class="col-span-2 sm:col-span-1 p-2 sm:p-3 rounded-2xl border text-xs font-bold text-center transition-all shadow-sm active:scale-95 cursor-pointer">
-                    📜 বাকি (Due)
-                </button>
-            </div>
-            <input type="hidden" name="payment_method" :value="paymentMethod">
-        </div>
+        <input type="hidden" name="payment_method" value="CASH">
 
-        <!-- TrxID for Digital Payments -->
-        <div x-show="['BKASH', 'NAGAD', 'ROCKET'].includes(paymentMethod)" x-cloak>
-            <label class="block text-xs font-bold text-slate-700 mb-1">MFS Transaction ID (TrxID)</label>
-            <input 
-                type="text" 
-                name="gateway_trx_id" 
-                placeholder="যেমন: 9J87AKL9"
-                class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-800 font-mono uppercase focus:border-emerald-500 focus:outline-none shadow-sm">
-        </div>
-
-        <!-- Paid Amount & Realtime Calculations -->
+        <!-- Cash received and change calculation -->
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
             <div>
                 <label class="block text-xs font-bold text-slate-700 mb-1">প্রাপ্ত টাকা (৳ Received)</label>
@@ -130,7 +71,7 @@
                 </div>
             </div>
             <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1">বকেয়া (Due ৳)</label>
+                <label class="block text-xs font-bold text-slate-700 mb-1">বকেয়া (Due ৳)</label>
                 <div class="w-full bg-rose-50 border border-rose-200 rounded-xl px-3 py-2 text-sm sm:text-base font-black text-rose-700 font-mono" x-text="'৳' + dueAmount">
                 </div>
             </div>
@@ -146,6 +87,8 @@
             </button>
             <button 
                 type="submit" 
+                :disabled="submitting || parseFloat(dueAmount) > 0"
+                :class="(submitting || parseFloat(dueAmount) > 0) ? 'opacity-50 cursor-not-allowed' : ''"
                 class="px-5 sm:px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs sm:text-sm shadow-lg shadow-emerald-600/25 flex items-center space-x-2 transition-all active:scale-95 cursor-pointer">
                 <span>কনফার্ম ও স্লিপ প্রিন্ট</span>
                 <kbd class="hidden sm:inline-block px-1.5 py-0.5 rounded bg-emerald-800 text-xs font-mono">Enter</kbd>

@@ -1,32 +1,13 @@
-<div id="cart-container" class="flex-1 flex flex-col min-h-0 relative bg-white">
+<div id="cart-container" {% if cart_oob %}hx-swap-oob="outerHTML"{% endif %} class="flex-1 flex flex-col min-h-0 relative bg-white">
     
-    <!-- Voice Success Banner / Notification -->
+    <!-- Keep the voice-add sound without covering the cart. -->
     {% if voice_success %}
-    <div 
-        x-data="{ show: true }" 
-        x-show="show" 
-        x-init="
-            try { if (typeof playCartAddSound === 'function') playCartAddSound(); } catch(e){}
-            try {
-                let msg = new SpeechSynthesisUtterance('{{ voice_success.medicine }} {{ voice_success.quantity }} টি যোগ করা হয়েছে');
-                msg.lang = 'bn-BD';
-                window.speechSynthesis.speak(msg);
-            } catch(e){}
-            setTimeout(() => show = false, 4000);
-        "
-        x-transition
-        class="absolute top-2 left-4 right-4 z-40 bg-emerald-600 text-white px-4 py-2.5 rounded-2xl font-bold text-xs shadow-xl flex items-center justify-between">
-        <div class="flex items-center space-x-2">
-            <span class="text-base">🎙️</span>
-            <span>ভয়েস কমান্ড সফল: <strong>{{ voice_success.medicine }}</strong> ({{ voice_success.quantity }} পিস) কার্টে যুক্ত হয়েছে!</span>
-        </div>
-        <button @click="show = false" class="text-white font-black hover:opacity-80">✕</button>
-    </div>
+    <span x-init="try { if (typeof playCartAddSound === 'function') playCartAddSound(); } catch(e){}" class="hidden" aria-hidden="true"></span>
     {% endif %}
 
     <!-- Table Header (Desktop/Tablet) -->
     <div class="hidden sm:grid sm:grid-cols-12 gap-2 px-4 py-1.5 bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500 select-none">
-        <div class="col-span-6">ঔষধের নাম ও মেয়াদ (Medicine & Expiry)</div>
+        <div class="col-span-6">ঔষধের নাম ও মেয়াদ (Medicine & Expiry)</div>
         <div class="col-span-3 text-center">পরিমাণ (Qty)</div>
         <div class="col-span-2 text-right">মোট মূল্য (৳)</div>
         <div class="col-span-1 text-center">মুছুন</div>
@@ -88,7 +69,7 @@
                         hx-target="#cart-container"
                         hx-swap="outerHTML"
                         {% if item.quantity >= item.max_stock %}disabled class="w-6 h-6 rounded-lg bg-slate-100 text-slate-400 font-bold flex items-center justify-center cursor-not-allowed text-xs"{% else %}class="w-6 h-6 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold flex items-center justify-center transition-colors shadow-2xs active:scale-95 text-xs"{% endif %}
-                        title="১টি বাড়ান">
+                        title="১টি বাড়ান">
                         +
                     </button>
                 </div>
@@ -185,9 +166,9 @@
                 <div class="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center text-2xl mb-3 text-slate-400">
                     🛒
                 </div>
-                <p class="text-base font-bold text-slate-700">কার্টটি বর্তমানে খালি রয়েছে</p>
+                <p class="text-base font-bold text-slate-700">কার্টটি বর্তমানে খালি রয়েছে</p>
                 <p class="text-xs text-slate-500 mt-1 text-center px-4">
-                    ডানপাশের তালিকা থেকে সিলেক্ট করুন অথবা 🎙️ ভয়েস বাটনে চাপ দিয়ে মুখে বলুন
+                    ডানপাশের তালিকা থেকে সিলেক্ট করুন অথবা 🎙️ ভয়েস বাটনে চাপ দিয়ে মুখে বলুন
                 </p>
             </div>
         {% endif %}

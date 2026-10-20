@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% block title %}সাবস্ক্রিপশন প্ল্যান | {{ tenant.name }}{% endblock %}
+
+{% block content %}
+<div x-data="{ sidebarOpen: false }" class="h-screen w-full bg-slate-100 flex flex-col lg:flex-row overflow-hidden">
+    <header class="lg:hidden bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shrink-0">
+        <button type="button" @click="sidebarOpen = true" class="p-2 rounded-xl bg-slate-100 text-slate-700" aria-label="মেনু খুলুন">☰</button>
+        <span class="font-bold text-slate-800 truncate px-2">{{ tenant.name }}</span>
+        <a href="{% url 'pos:screen' %}" class="px-3 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold">POS</a>
+    </header>
+    <div x-show="sidebarOpen" x-cloak @click="sidebarOpen = false" class="fixed inset-0 z-40 bg-black/60 lg:hidden"></div>
+    <div x-show="sidebarOpen" x-cloak class="fixed inset-y-0 left-0 z-50 w-72 lg:hidden">
+        {% include "partials/tenant_sidebar.html" with active_tab="subscription" %}
+    </div>
+    <aside class="hidden lg:block h-screen shrink-0">
+        {% include "partials/tenant_sidebar.html" with active_tab="subscription" %}
+    </aside>
+
+    <main class="min-w-0 min-h-0 flex-1 overflow-y-auto">
+        <header class="hidden lg:flex sticky top-0 z-20 bg-white border-b border-slate-200 px-4 sm:px-8 py-4 items-center justify-between gap-3">
+            <div class="min-w-0">
+                <h1 class="font-black text-slate-900 text-lg">💎 সাবস্ক্রিপশন প্ল্যান</h1>
+                <p class="text-xs text-slate-500 truncate">{{ tenant.name }} • বর্তমান প্যাকেজ ও নবায়ন তথ্য</p>
+            </div>
+            <a href="{% url 'tenant_dashboard:dashboard' %}" class="shrink-0 px-3 py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold">ড্যাশবোর্ড</a>
+        </header>
+
+        <section class="max-w-6xl mx-auto p-4 sm:p-8 space-y-6">
+            {% if messages %}
+                {% for message in messages %}
+                <div class="rounded-xl border px-4 py-3 text-sm font-semibold {% if message.tags == 'success' %}bg-emerald-50 border-emerald-200 text-emerald-800{% else %}bg-rose-50 border-rose-200 text-rose-800{% endif %}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+
+            <article class="rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-5 sm:p-7 text-white shadow-xl">
+                <div class="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <div class="text-xs font-bold uppercase tracking-wide text-indigo-300">আপনার বর্তমান প্যাকেজ</div>
+                        <div class="mt-2 flex flex-wrap items-center gap-2">
+                            <h2 class="text-2xl font-black">{{ subscription.plan.name }}</h2>
+                            <span class="rounded-full px-2.5 py-1 text-xs font-bold {% if subscription.status == 'active' %}bg-emerald-500/20 text-emerald-300{% elif subscription.status == 'trial' %}bg-cyan-500/20 text-cyan-300{% else %}bg-rose-500/20 text-rose-300{% endif %}">{{ subscription.get_status_display|default:subscription.status|title }}</span>
+                        </div>
+                        <p class="mt-2 text-sm text-slate-300">মেয়াদ শেষ: <strong class="text-white">{{ subscription.expires_at|date:"d M Y" }}</strong> · বাকি {{ days_remaining }} দিন</p>
+                        <p class="mt-1 text-sm text-slate-300">এসএমএস ব্যালেন্স: <strong class="text-white">{{ subscription.sms_balance }} টি</strong></p>
+                    </div>
+                    <a href="{% if platform_settings and platform_settings.support_phone %}tel:{{ platform_settings.support_phone }}{% else %}mailto:{{ platform_settings.support_email|default:'support@webkoders.com' }}{% endif %}" class="inline-flex shrink-0 items-center justify-center rounded-xl bg-gradient-to-r from-indigo-500 to-cyan-500 px-5 py-3 text-sm font-extrabold shadow-lg">নবায়ন বা আপগ্রেডের জন্য যোগাযোগ</a>
+                </div>
+            </article>
+
+            <div>
+                <div class="mb-4">
+                    <h2 class="text-lg font-black text-slate-900">উপলভ্য প্ল্যান</h2>
+                    <p class="mt-1 text-sm text-slate-500">প্রতিটি প্যাকেজের সীমা ও মাসিক মূল্য তুলনা করুন। প্ল্যান পরিবর্তনে সাপোর্ট টিমের সঙ্গে যোগাযোগ করুন।</p>
+                </div>
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                    {% for plan in available_plans %}
+                    <article class="flex flex-col rounded-2xl border bg-white p-5 shadow-sm {% if plan.id == subscription.plan.id %}border-emerald-400 ring-2 ring-emerald-100{% else %}border-slate-200{% endif %}">
+                        <div class="flex items-start justify-between gap-2">
+                            <h3 class="font-extrabold text-slate-900">{{ plan.name }}</h3>
+                            {% if plan.id == subscription.plan.id %}<span class="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-bold text-emerald-800">বর্তমান</span>{% endif %}
+                        </div>
+                        <div class="mt-3 text-2xl font-black text-emerald-700">৳{{ plan.monthly_price_bdt }}<span class="text-xs font-medium text-slate-500"> / মাস</span></div>
+                        <ul class="mt-4 flex-1 space-y-2 border-t border-slate-100 pt-4 text-sm text-slate-600">
+                            <li>✓ শাখা: <strong>{{ plan.max_branches }}</strong></li>
+                            <li>✓ ব্যবহারকারী: <strong>{{ plan.max_users }}</strong></li>
+                            <li>✓ অন্তর্ভুক্ত SMS: <strong>{{ plan.sms_bundle_included }}</strong></li>
+                        </ul>
+                        {% if plan.id != subscription.plan.id %}
+                        <a href="{% if platform_settings and platform_settings.support_phone %}tel:{{ platform_settings.support_phone }}{% else %}mailto:{{ platform_settings.support_email|default:'support@webkoders.com' }}{% endif %}" class="mt-5 rounded-xl bg-slate-100 px-4 py-2.5 text-center text-sm font-bold text-slate-800 hover:bg-slate-200">এই প্ল্যান সম্পর্কে যোগাযোগ</a>
+                        {% endif %}
+                    </article>
+                    {% empty %}
+                    <div class="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">এখন কোনো সক্রিয় প্ল্যান পাওয়া যায়নি। সাপোর্ট টিমের সঙ্গে যোগাযোগ করুন।</div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <p class="rounded-2xl bg-white p-4 text-center text-sm text-slate-600 shadow-sm">bKash, Nagad বা ব্যাংক পেমেন্টের মাধ্যমে নবায়নের জন্য <a class="font-bold text-emerald-700 underline" href="mailto:{{ platform_settings.support_email|default:'support@webkoders.com' }}">{{ platform_settings.support_email|default:"support@webkoders.com" }}</a>-এ যোগাযোগ করুন।</p>
+        </section>
+    </main>
+</div>
+{% endblock %}

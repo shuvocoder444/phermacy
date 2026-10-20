@@ -11,18 +11,14 @@
     }
 </style>
 
-<div x-data="{ 
-    sidebarOpen: false,
-    settingsModalOpen: false, 
-    upgradeModalOpen: false 
-}" class="h-screen w-full bg-slate-100 flex flex-col md:flex-row overflow-hidden font-sans">
+<div x-data="{ sidebarOpen: false }" class="h-screen w-full bg-slate-100 flex flex-col lg:flex-row overflow-hidden font-sans">
 
     <!-- Mobile Top Bar with Drawer Toggle -->
-    <div class="md:hidden bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between sticky top-0 z-40 shrink-0">
+    <div class="lg:hidden bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between sticky top-0 z-40 shrink-0">
         <div class="flex items-center space-x-3">
-            <button 
-                type="button" 
-                @click="sidebarOpen = !sidebarOpen" 
+            <button
+                type="button"
+                @click="sidebarOpen = !sidebarOpen"
                 class="p-2 rounded-xl bg-slate-100 text-slate-700 border border-slate-200 hover:text-slate-900"
                 title="মেনু খুলুন">
                 <span class="text-xl leading-none">☰</span>
@@ -32,38 +28,38 @@
                 <span class="text-sm font-black text-slate-900 truncate">{{ tenant.name }}</span>
             </div>
         </div>
-        <a href="{% url 'pos:screen' %}" 
+        <a href="{% url 'pos:screen' %}"
            class="px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-bold shadow-md">
             ⚡ POS
         </a>
     </div>
 
     <!-- Mobile Drawer Overlay Backdrop -->
-    <div 
-        x-show="sidebarOpen" 
-        x-cloak 
-        @click="sidebarOpen = false" 
-        class="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden">
+    <div
+        x-show="sidebarOpen"
+        x-cloak
+        @click="sidebarOpen = false"
+        class="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden">
     </div>
 
     <!-- Mobile Drawer Container -->
-    <div 
-        x-show="sidebarOpen" 
-        x-cloak 
-        class="fixed inset-y-0 left-0 z-50 w-72 md:hidden">
+    <div
+        x-show="sidebarOpen"
+        x-cloak
+        class="fixed inset-y-0 left-0 z-50 w-72 lg:hidden">
         {% include "partials/tenant_sidebar.html" with active_tab="dashboard" %}
     </div>
 
     <!-- Desktop Sidebar -->
-    <div class="hidden md:block shrink-0 h-screen">
+    <div class="hidden lg:block shrink-0 h-screen">
         {% include "partials/tenant_sidebar.html" with active_tab="dashboard" %}
     </div>
 
     <!-- Main Content Area -->
-    <div class="flex-1 h-screen flex flex-col min-w-0 overflow-y-auto bg-slate-100">
+    <div class="flex-1 min-h-0 flex flex-col min-w-0 overflow-y-auto bg-slate-100">
 
         <!-- Top Content Header Bar -->
-        <header class="bg-white border-b border-slate-200 sticky top-0 z-20 px-4 sm:px-8 py-3.5 flex items-center justify-between shadow-xs shrink-0">
+        <header class="hidden lg:flex bg-white border-b border-slate-200 sticky top-0 z-20 px-4 sm:px-8 py-3.5 items-center justify-between shadow-xs shrink-0">
             <div>
                 <h1 class="text-base sm:text-lg font-black text-slate-800 flex items-center space-x-2">
                     <span>📊 ফার্মেসি ওভারভিউ ড্যাশবোর্ড</span>
@@ -76,13 +72,11 @@
                     <span>⚡</span>
                     <span>পিওএস টার্মিনাল</span>
                 </a>
-                <button 
-                    type="button" 
-                    @click="settingsModalOpen = true"
+                <a href="{% url 'tenant_dashboard:settings' %}"
                     class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold transition-all"
                     title="ফার্মেসি প্রোফাইল ও সেটিংস">
                     ⚙️
-                </button>
+                </a>
             </div>
         </header>
 
@@ -102,7 +96,7 @@
         {% endif %}
 
         <!-- Subscription & Account Status Banner -->
-        <div class="p-5 rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white shadow-xl flex flex-col md:flex-row items-center justify-between gap-4 border border-slate-800">
+        <div class="p-5 rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white shadow-xl flex flex-col lg:flex-row items-center justify-between gap-4 border border-slate-800">
             <div class="flex items-center space-x-4">
                 <div class="w-12 h-12 rounded-2xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-2xl">
                     💎
@@ -115,16 +109,16 @@
                         </span>
                         {% if subscription.status == 'active' %}
                         <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold">
-                            ● সক্রিয়
+                            ● সক্রিয়
                         </span>
                         {% elif subscription.status == 'trial' %}
                         <span class="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 font-bold">
-                            ● ট্রায়াল
+                            ● ট্রায়াল
                         </span>
                         {% endif %}
                     </div>
                     <div class="text-xs text-slate-300 mt-1 flex items-center space-x-3">
-                        <span>মেয়াদ শেষ: <strong class="text-white font-mono">{{ subscription.expires_at|date:"d M Y" }}</strong></span>
+                        <span>মেয়াদ শেষ: <strong class="text-white font-mono">{{ subscription.expires_at|date:"d M Y" }}</strong></span>
                         <span>•</span>
                         <span class="{% if is_expiring_soon %}text-amber-400 font-bold{% else %}text-emerald-400{% endif %}">
                             বাকি আছে: <strong>{{ days_remaining }} দিন</strong>
@@ -135,13 +129,11 @@
                 </div>
             </div>
 
-            <button 
-                type="button" 
-                @click="upgradeModalOpen = true"
+            <a href="{% url 'tenant_dashboard:subscription' %}"
                 class="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-indigo-500 to-cyan-500 hover:from-indigo-600 hover:to-cyan-600 text-white text-xs font-black shadow-lg shadow-indigo-500/25 transition-all flex items-center space-x-1.5 active:scale-95 shrink-0">
                 <span>⚡</span>
                 <span>সাবস্ক্রিপশন রিনিউ বা আপগ্রেড করুন</span>
-            </button>
+            </a>
         </div>
 
         <!-- Today's Financial Overview Cards -->
@@ -149,7 +141,7 @@
             <div class="flex items-center justify-between mb-3">
                 <h2 class="text-sm font-extrabold text-slate-800 flex items-center space-x-1.5">
                     <span>📅</span>
-                    <span>আজকের বিক্রয় ও ক্যাশ হিসাব ({{ now_date|date:"d M Y" }})</span>
+                    <span>আজকের বিক্রয় ও ক্যাশ হিসাব ({{ now_date|date:"d M Y" }})</span>
                 </h2>
                 <span class="text-xs text-slate-500">লাইভ আপডেট</span>
             </div>
@@ -158,24 +150,24 @@
                 <!-- Today Total Sales -->
                 <div class="p-5 rounded-3xl bg-white border border-slate-200 shadow-sm relative overflow-hidden">
                     <div class="flex items-center justify-between">
-                        <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">আজকের মোট বিক্রয়</span>
+                        <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">আজকের মোট বিক্রয়</span>
                         <span class="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-lg">💰</span>
                     </div>
                     <div class="mt-3 text-3xl font-black text-emerald-700 font-mono">৳{{ today_sales }}</div>
                     <div class="mt-2 text-xs text-slate-500 font-semibold">
-                        মোট ইনভয়েস: <strong class="text-slate-800 font-mono">{{ today_invoices_count }} টি</strong>
+                        মোট ইনভয়েস: <strong class="text-slate-800 font-mono">{{ today_invoices_count }} টি</strong>
                     </div>
                 </div>
 
                 <!-- Today Cash Sales -->
                 <div class="p-5 rounded-3xl bg-white border border-slate-200 shadow-sm relative overflow-hidden">
                     <div class="flex items-center justify-between">
-                        <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">ক্যাশ আদায় (ক্যাশ ড্রয়ার)</span>
+                        <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">ক্যাশ আদায় (ক্যাশ ড্রয়ার)</span>
                         <span class="w-9 h-9 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center text-lg">💵</span>
                     </div>
                     <div class="mt-3 text-3xl font-black text-teal-700 font-mono">৳{{ today_cash_sales }}</div>
                     <div class="mt-2 text-xs text-slate-500 font-semibold">
-                        ড্রয়ারে প্রাপ্ত নগদ অর্থ
+                        ড্রয়ারে প্রাপ্ত নগদ অর্থ
                     </div>
                 </div>
 
@@ -194,7 +186,7 @@
                 <!-- Today Due Sales -->
                 <div class="p-5 rounded-3xl bg-white border border-slate-200 shadow-sm relative overflow-hidden">
                     <div class="flex items-center justify-between">
-                        <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">আজকের বাকি বিক্রয়</span>
+                        <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">আজকের বাকি বিক্রয়</span>
                         <span class="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-lg">📒</span>
                     </div>
                     <div class="mt-3 text-3xl font-black text-amber-600 font-mono">৳{{ today_due_sales }}</div>
@@ -220,9 +212,9 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <!-- Month Total Sales -->
                 <div class="p-5 rounded-3xl bg-white border border-slate-200 shadow-sm">
-                    <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">মাসিক মোট বিক্রয়</span>
+                    <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">মাসিক মোট বিক্রয়</span>
                     <div class="mt-2 text-2xl font-black text-slate-800 font-mono">৳{{ month_sales }}</div>
-                    <div class="mt-1 text-xs text-slate-400">ইনভয়েস: {{ month_invoices_count }} টি</div>
+                    <div class="mt-1 text-xs text-slate-400">ইনভয়েস: {{ month_invoices_count }} টি</div>
                 </div>
 
                 <!-- Customer Total Dues -->
@@ -236,14 +228,14 @@
                 <div class="p-5 rounded-3xl bg-white border border-slate-200 shadow-sm">
                     <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">দোকানের মোট খরচ (লেজার)</span>
                     <div class="mt-2 text-2xl font-black text-indigo-600 font-mono">৳{{ month_expenses }}</div>
-                    <div class="mt-1 text-xs text-slate-400">ভাড়া, বেতন, বিদ্যুৎ বিল ও অন্য খরচ</div>
+                    <div class="mt-1 text-xs text-slate-400">ভাড়া, বেতন, বিদ্যুৎ বিল ও অন্য খরচ</div>
                 </div>
 
                 <!-- Estimated Gross Profit -->
                 <div class="p-5 rounded-3xl bg-emerald-50/80 border border-emerald-200 shadow-sm">
                     <span class="text-xs font-bold text-emerald-800 uppercase tracking-wider">আনুমানিক নেট ব্যালেন্স</span>
                     <div class="mt-2 text-2xl font-black text-emerald-700 font-mono">৳{{ estimated_profit }}</div>
-                    <div class="mt-1 text-xs text-emerald-600 font-semibold">বিক্রয় বিয়োগ দোকান খরচ</div>
+                    <div class="mt-1 text-xs text-emerald-600 font-semibold">বিক্রয় বিয়োগ দোকান খরচ</div>
                 </div>
             </div>
         </div>
@@ -256,7 +248,7 @@
                     <div class="flex items-center space-x-2">
                         <span class="text-xl">⚠️</span>
                         <div>
-                            <h3 class="text-sm font-extrabold text-slate-800">লো স্টক এলার্ট (স্টক শেষ হয়ে আসছে)</h3>
+                            <h3 class="text-sm font-extrabold text-slate-800">লো স্টক এলার্ট (স্টক শেষ হয়ে আসছে)</h3>
                             <p class="text-xs text-slate-500">সীমা: {{ tenant.low_stock_threshold }} পিসের নিচে থাকা ঔষধ</p>
                         </div>
                     </div>
@@ -270,7 +262,7 @@
                         <thead class="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold">
                             <tr>
                                 <th class="py-2.5 px-3">ঔষধের নাম</th>
-                                <th class="py-2.5 px-3">ফর্ম ও পাওয়ার</th>
+                                <th class="py-2.5 px-3">ফর্ম ও পাওয়ার</th>
                                 <th class="py-2.5 px-3 text-right">বর্তমান স্টক</th>
                             </tr>
                         </thead>
@@ -282,7 +274,7 @@
                                 <td class="py-2.5 px-3 text-right font-black text-rose-600 font-mono">{{ med.total_stock }} পিস</td>
                             </tr>
                             {% empty %}
-                            <tr><td colspan="3" class="text-center py-4 text-emerald-600 font-bold">✓ সকল ঔষধ পর্যাপ্ত স্টকে রয়েছে!</td></tr>
+                            <tr><td colspan="3" class="text-center py-4 text-emerald-600 font-bold">✓ সকল ঔষধ পর্যাপ্ত স্টকে রয়েছে!</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
@@ -295,8 +287,8 @@
                     <div class="flex items-center space-x-2">
                         <span class="text-xl">⏰</span>
                         <div>
-                            <h3 class="text-sm font-extrabold text-slate-800">মেয়াদোত্তীর্ণ এলার্ট (আগামী ৬০ দিন)</h3>
-                            <p class="text-xs text-slate-500">দ্রুত বিক্রয় বা রিটার্নের জন্য FEFO ব্যাচ তালিকা</p>
+                            <h3 class="text-sm font-extrabold text-slate-800">মেয়াদোত্তীর্ণ এলার্ট (আগামী ৬০ দিন)</h3>
+                            <p class="text-xs text-slate-500">দ্রুত বিক্রয় বা রিটার্নের জন্য FEFO ব্যাচ তালিকা</p>
                         </div>
                     </div>
                     <span class="px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 font-black text-xs font-mono">
@@ -309,7 +301,7 @@
                         <thead class="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold">
                             <tr>
                                 <th class="py-2.5 px-3">ঔষধ ও ব্যাচ</th>
-                                <th class="py-2.5 px-3">মেয়াদ শেষ</th>
+                                <th class="py-2.5 px-3">মেয়াদ শেষ</th>
                                 <th class="py-2.5 px-3 text-right">স্টক</th>
                             </tr>
                         </thead>
@@ -324,7 +316,7 @@
                                 <td class="py-2.5 px-3 text-right font-black text-slate-700 font-mono">{{ b.current_stock }} পিস</td>
                             </tr>
                             {% empty %}
-                            <tr><td colspan="3" class="text-center py-4 text-emerald-600 font-bold">✓ আগামী ৬০ দিনে মেয়াদোত্তীর্ণ কোনো ব্যাচ নেই!</td></tr>
+                            <tr><td colspan="3" class="text-center py-4 text-emerald-600 font-bold">✓ আগামী ৬০ দিনে মেয়াদোত্তীর্ণ কোনো ব্যাচ নেই!</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
@@ -338,12 +330,12 @@
                 <div>
                     <h3 class="text-sm font-extrabold text-slate-800 flex items-center space-x-1.5">
                         <span>🧾</span>
-                        <span>সাম্প্রতিক বিক্রয় ট্রানজেকশন (Recent POS Sales)</span>
+                        <span>সাম্প্রতিক বিক্রয় ট্রানজেকশন (Recent POS Sales)</span>
                     </h3>
-                    <p class="text-xs text-slate-500">কাউন্টার থেকে প্রস্তুতকৃত সর্বশেষ ইনভয়েসসমূহ</p>
+                    <p class="text-xs text-slate-500">কাউন্টার থেকে প্রস্তুতকৃত সর্বশেষ ইনভয়েসসমূহ</p>
                 </div>
                 <a href="{% url 'pos:screen' %}" class="px-3.5 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold text-xs transition-all">
-                    + নতুন বিক্রয় করুন
+                    + নতুন বিক্রয় করুন
                 </a>
             </div>
 
@@ -351,11 +343,11 @@
                 <table class="w-full text-left text-xs">
                     <thead class="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold">
                         <tr>
-                            <th class="py-3 px-4">ইনভয়েস নং</th>
+                            <th class="py-3 px-4">ইনভয়েস নং</th>
                             <th class="py-3 px-4">কাস্টমার</th>
                             <th class="py-3 px-4">পেমেন্ট মাধ্যম</th>
                             <th class="py-3 px-4">মোট টাকা</th>
-                            <th class="py-3 px-4">তারিখ ও সময়</th>
+                            <th class="py-3 px-4">তারিখ ও সময়</th>
                             <th class="py-3 px-4">স্ট্যাটাস</th>
                             <th class="py-3 px-4 text-right">রিসিপ্ট</th>
                         </tr>
@@ -384,7 +376,7 @@
                             </td>
                         </tr>
                         {% empty %}
-                        <tr><td colspan="7" class="text-center py-6 text-slate-400">এখনো কোনো বিক্রয় রেকর্ড তৈরি হয়নি।</td></tr>
+                        <tr><td colspan="7" class="text-center py-6 text-slate-400">এখনো কোনো বিক্রয় রেকর্ড তৈরি হয়নি।</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
@@ -392,131 +384,7 @@
         </div>
     </main>
 
-    <!-- Modal: Pharmacy Store Profile & Licensing Settings -->
-    <div x-show="settingsModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" x-cloak>
-        <div @click.away="settingsModalOpen = false" class="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
-            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
-                <div class="flex items-center space-x-2">
-                    <span class="text-2xl">⚙️</span>
-                    <h3 class="text-base font-extrabold text-slate-800">ফার্মেসি প্রোফাইল ও সেটিংস</h3>
-                </div>
-                <button @click="settingsModalOpen = false" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
-            </div>
 
-            <form method="POST" action="{% url 'tenant_dashboard:settings_update' %}" class="space-y-3.5 text-xs text-slate-700">
-                {% csrf_token %}
-
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                        <label class="block font-bold text-slate-700 mb-1">ফার্মেসির নাম (English) *</label>
-                        <input type="text" name="name" value="{{ tenant.name }}" required class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:outline-none">
-                    </div>
-                    <div>
-                        <label class="block font-bold text-slate-700 mb-1">ফার্মেসির নাম (বাংলা)</label>
-                        <input type="text" name="name_bn" value="{{ tenant.name_bn|default:'' }}" class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:outline-none">
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                        <label class="block font-bold text-slate-700 mb-1">মোবাইল নম্বর *</label>
-                        <input type="text" name="phone" value="{{ tenant.phone }}" required class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:outline-none">
-                    </div>
-                    <div>
-                        <label class="block font-bold text-slate-700 mb-1">ইমেইল</label>
-                        <input type="email" name="email" value="{{ tenant.email|default:'' }}" class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:outline-none">
-                    </div>
-                </div>
-
-                <div>
-                    <label class="block font-bold text-slate-700 mb-1">দোকানের ঠিকানা (রিসিপ্টে প্রদর্শিত হবে)</label>
-                    <textarea name="address" rows="2" class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:outline-none">{{ tenant.address|default:'' }}</textarea>
-                </div>
-
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                        <label class="block font-bold text-slate-700 mb-1">DGDA ড্রাগ লাইসেন্স নং</label>
-                        <input type="text" name="drug_license_number" value="{{ tenant.drug_license_number|default:'' }}" placeholder="DGDA-xxx" class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:outline-none">
-                    </div>
-                    <div>
-                        <label class="block font-bold text-slate-700 mb-1">ট্রেড লাইসেন্স নং</label>
-                        <input type="text" name="trade_license_number" value="{{ tenant.trade_license_number|default:'' }}" class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:outline-none">
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                        <label class="block font-bold text-slate-700 mb-1">ভ্যাট BIN নম্বর</label>
-                        <input type="text" name="vat_reg_number" value="{{ tenant.vat_reg_number|default:'' }}" placeholder="BIN-xxxx" class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:outline-none">
-                    </div>
-                    <div>
-                        <label class="block font-bold text-slate-700 mb-1">স্ট্যান্ডার্ড ভ্যাট হার (%)</label>
-                        <input type="number" step="0.01" name="default_vat_rate" value="{{ tenant.default_vat_rate }}" class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:outline-none">
-                    </div>
-                </div>
-
-                <div>
-                    <label class="block font-bold text-slate-700 mb-1">লো-স্টক অ্যালার্ট সীমা (পিস)</label>
-                    <input type="number" name="low_stock_threshold" value="{{ tenant.low_stock_threshold }}" class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:outline-none">
-                    <p class="text-[10px] text-slate-400 mt-0.5">ঔষধের মোট স্টক এর নিচে নামলে ড্যাশবোর্ডে লাল সতর্কবার্তা দেখাবে।</p>
-                </div>
-
-                <div class="pt-3 border-t border-slate-100 flex items-center justify-end space-x-2">
-                    <button type="button" @click="settingsModalOpen = false" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold">
-                        বাতিল
-                    </button>
-                    <button type="submit" class="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold shadow-md">
-                        সংরক্ষণ করুন
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Modal: Subscription Upgrade & Plans -->
-    <div x-show="upgradeModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" x-cloak>
-        <div @click.away="upgradeModalOpen = false" class="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl space-y-4">
-            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
-                <div class="flex items-center space-x-2">
-                    <span class="text-2xl">💎</span>
-                    <h3 class="text-base font-extrabold text-slate-800">সাবস্ক্রিপশন প্ল্যান ও রিনিউয়াল</h3>
-                </div>
-                <button @click="upgradeModalOpen = false" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-                {% for plan in available_plans %}
-                <div class="p-4 rounded-2xl border {% if plan.id == subscription.plan.id %}border-emerald-500 bg-emerald-50/40 shadow-md{% else %}border-slate-200 bg-slate-50{% endif %} flex flex-col justify-between">
-                    <div>
-                        <div class="font-extrabold text-slate-800 text-sm">{{ plan.name }}</div>
-                        <div class="text-xl font-black text-emerald-700 font-mono mt-1">৳{{ plan.monthly_price_bdt }}<span class="text-xs font-normal text-slate-500">/মাস</span></div>
-                        <ul class="mt-3 space-y-1 text-slate-600">
-                            <li>✓ শাখা: {{ plan.max_branches }}টি</li>
-                            <li>✓ ইউজার: {{ plan.max_users }}জন</li>
-                            <li>✓ ফ্রি এসএমএস: {{ plan.sms_bundle_included }}টি</li>
-                        </ul>
-                    </div>
-
-                    <div class="mt-4 pt-3 border-t border-slate-200">
-                        {% if plan.id == subscription.plan.id %}
-                        <span class="block text-center py-1.5 rounded-xl bg-emerald-600 text-white font-bold text-[11px]">
-                            ✓ বর্তমান প্ল্যান
-                        </span>
-                        {% else %}
-                        <a href="tel:01700000000" class="block text-center py-1.5 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-[11px]">
-                            আপগ্রেড করতে কল করুন
-                        </a>
-                        {% endif %}
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-
-            <div class="p-3 bg-slate-100 rounded-2xl text-[11px] text-slate-600 text-center">
-                💳 bKash, Nagad, বা ব্যাংক পেমেন্টের মাধ্যমে ইনস্ট্যান্ট রিনিউ করতে সাপোর্ট টিমের সাথে যোগাযোগ করুন: <strong>support@webkoders.com</strong>
-            </div>
-        </div>
-    </div>
 </div>
 </div>
 {% endblock %}

@@ -15,7 +15,6 @@
         </div>
         <button 
             type="button" 
-            onclick="sendDetectedToSearch('{{ primary_brand_name|default:detected_drugs.0.brand_name|escapejs }}')"
             @click="sendDetectedToSearch('{{ primary_brand_name|default:detected_drugs.0.brand_name|escapejs }}')"
             class="w-full sm:w-auto px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-extrabold rounded-xl text-xs sm:text-sm shadow-md shadow-emerald-600/30 flex items-center justify-center space-x-2 transition-all active:scale-95 shrink-0"
             title="এই নামটি সরাসরি মূল সার্চ বারে বসিয়ে সব ভ্যারিয়েন্ট ও ফর্ম দেখুন">
@@ -27,7 +26,7 @@
     <!-- Engine Badge and Meta Info -->
     <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500 px-1 pb-1 border-b border-slate-200">
         <div class="flex flex-wrap items-center gap-2">
-            <span class="text-emerald-700 font-extrabold text-xs">✓ {{ detected_drugs|length }}টি ভ্যারিয়েন্ট পাওয়া গেছে</span>
+            <span class="text-emerald-700 font-extrabold text-xs">✓ {{ detected_drugs|length }}টি ভ্যারিয়েন্ট পাওয়া গেছে</span>
             {% if ai_engine == "gemini" %}
             <span class="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-bold flex items-center gap-1 shadow-sm">
                 <span>✨</span> Gemini AI Vision
@@ -83,7 +82,6 @@
                 {% if drug.fefo_batch %}
                 <button 
                     type="button"
-                    onclick="addScannedDrugToCart('{{ drug.fefo_batch.id }}')"
                     @click="addDrugBatch('{{ drug.fefo_batch.id }}'); cameraModalOpen = false; stopCamera();"
                     class="px-4 py-2 sm:px-3.5 sm:py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-extrabold text-xs sm:text-sm shadow-md shadow-emerald-600/25 flex items-center space-x-1.5 transition-all shrink-0">
                     <span>➕</span>
@@ -115,7 +113,6 @@
         </div>
         <button 
             type="button" 
-            onclick="sendDetectedToSearch('{{ primary_brand_name|escapejs }}')"
             @click="sendDetectedToSearch('{{ primary_brand_name|escapejs }}')"
             class="w-full sm:w-auto px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-extrabold rounded-xl text-xs sm:text-sm shadow-md shadow-emerald-600/30 flex items-center justify-center space-x-2 transition-all active:scale-95 shrink-0"
             title="এই নামটি সরাসরি মূল সার্চ বারে বসিয়ে সব ভ্যারিয়েন্ট ও ফর্ম দেখুন">
@@ -129,7 +126,7 @@
         🔍
     </div>
     <div>
-        <p class="font-extrabold text-slate-800 text-sm sm:text-base">সরাসরি স্টক ভ্যারিয়েন্ট পাওয়া যায়নি</p>
+        <p class="font-extrabold text-slate-800 text-sm sm:text-base">সরাসরি স্টক ভ্যারিয়েন্ট পাওয়া যায়নি</p>
         <p class="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
             নিচের "সার্চ করুন" বাটনে ক্লিক করে মূল ক্যাটালগ থেকে যোগ করুন অথবা AI কে শেখান।
         </p>
@@ -137,21 +134,19 @@
 
     <div class="p-3 bg-slate-100 rounded-xl text-[11px] text-slate-700 font-mono break-words text-left max-w-md mx-auto border border-slate-200">
         <strong class="text-slate-800">স্ক্যান করা টেক্সট:</strong> <br>
-        <span class="text-slate-900 font-bold">{{ raw_text|default:"কোনো স্পষ্ট টেক্সট রিড করা যায়নি!" }}</span>
+        <span class="text-slate-900 font-bold">{{ raw_text|default:"কোনো স্পষ্ট টেক্সট রিড করা যায়নি!" }}</span>
     </div>
 
-    {% if raw_text and raw_text != "কোনো টেক্সট রিড করা যায়নি" and raw_text != "কোনো টেক্সট পাওয়া যায়নি!" %}
+    {% if raw_text and raw_text != "কোনো টেক্সট রিড করা যায়নি" and raw_text != "কোনো টেক্সট পাওয়া যায়নি!" %}
     <div class="flex flex-col sm:flex-row items-center justify-center gap-2 pt-2 max-w-md mx-auto">
         <button 
             type="button" 
-            onclick="sendDetectedToSearch('{{ primary_brand_name|default:raw_text|escapejs }}')"
             @click="sendDetectedToSearch('{{ primary_brand_name|default:raw_text|escapejs }}')"
             class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow-md transition-all flex items-center justify-center space-x-1.5 active:scale-95">
-            <span>🔍 এই লেখা দিয়ে সার্চ করুন</span>
+            <span>🔍 এই লেখা দিয়ে সার্চ করুন</span>
         </button>
         <button 
             type="button" 
-            onclick="openTrainModalFromScan('{{ raw_text|escapejs }}')"
             @click="openTrainModal('{{ raw_text|escapejs }}')"
             class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-xs shadow-md transition-all flex items-center justify-center space-x-1.5 active:scale-95">
             <span>🎓 AI কে ঔষধ শেখান</span>

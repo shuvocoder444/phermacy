@@ -13,7 +13,7 @@
     <section class="rounded-xl bg-white p-4 shadow-sm">
       <label for="medicine-search" class="mb-2 block font-semibold">Find medicine</label>
       <input id="medicine-search" autofocus name="q" type="search"
-        placeholder="Brand, generic or বাংলায় খুঁজুন"
+        placeholder="Brand, generic or বাংলায় খুঁজুন"
         class="w-full rounded-lg border border-slate-300 px-4 py-3 text-lg"
         hx-get="{% url 'pos_search' %}" hx-trigger="input changed delay:150ms, search"
         hx-target="#search-results" hx-swap="innerHTML">

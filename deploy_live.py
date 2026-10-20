@@ -12,11 +12,11 @@ REMOTE_BASE = "/home/webkoders/pos.webkoders.com"
 LOCAL_BASE = r"D:\phermacy"
 
 IGNORE_DIRS = {
-    ".git", ".vscode", "venv", "__pycache__", ".venv", ".idea", ".DS_Store"
+    ".git", ".vscode", "venv", "__pycache__", ".venv", ".idea", ".DS_Store", "scratch", "media"
 }
 
 IGNORE_FILES = {
-    "pharmacy_deploy.zip", ".DS_Store", "deploy_live.py", "deploy_to_cpanel.py"
+    "pharmacy_deploy.zip", ".DS_Store", "deploy_live.py", "deploy_to_cpanel.py", "db.sqlite3", ".env", "live.py", "stderr.log"
 }
 
 def run_cmd(ssh, cmd):
@@ -101,9 +101,10 @@ def deploy():
         py_bin = "/home/webkoders/virtualenv/pos.webkoders.com/3.9/bin/python"
         pip_bin = "/home/webkoders/virtualenv/pos.webkoders.com/3.9/bin/pip"
         
-        print("[*] Installing Python packages in remote virtualenv...")
-        run_cmd(ssh, f"{pip_bin} install --upgrade pip")
-        run_cmd(ssh, f"{pip_bin} install django==4.2.16 requests pillow")
+        print("[*] Running migrations & collectstatic...")
+        run_cmd(ssh, f"cd {REMOTE_BASE} && {py_bin} manage.py migrate --noinput")
+        run_cmd(ssh, f"cd {REMOTE_BASE} && {py_bin} manage.py createcachetable")
+        run_cmd(ssh, f"cd {REMOTE_BASE} && {py_bin} manage.py collectstatic --noinput")
 
         # 3. Ensure tmp directory & passenger restart
         tmp_dir = posixpath.join(REMOTE_BASE, "tmp")

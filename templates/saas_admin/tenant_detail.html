@@ -5,7 +5,7 @@
 {% block content %}
 <div class="min-h-screen bg-slate-900 text-slate-100 flex flex-col font-sans">
     <!-- Header -->
-    <header class="bg-slate-950/80 backdrop-blur-md border-b border-slate-800 sticky top-0 z-40 px-4 sm:px-8 py-3.5 flex items-center justify-between">
+    <header class="bg-slate-950/80 backdrop-blur-md border-b border-slate-800 sticky top-0 z-40 px-3 sm:px-8 py-3.5 flex flex-wrap items-center justify-between gap-2">
         <div class="flex items-center space-x-3">
             <a href="{% url 'saas_admin:dashboard' %}" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs">
                 ← ফিরে যান
@@ -28,7 +28,7 @@
                 {% csrf_token %}
                 <input type="hidden" name="action" value="toggle_active">
                 <button type="submit" class="px-3 py-1.5 rounded-xl {% if tenant.is_active %}bg-rose-600/30 hover:bg-rose-600 text-rose-300{% else %}bg-emerald-600/30 hover:bg-emerald-600 text-emerald-300{% endif %} font-bold text-xs border border-slate-700">
-                    {% if tenant.is_active %}স্থগিত করুন{% else %}সক্রিয় করুন{% endif %}
+                    {% if tenant.is_active %}স্থগিত করুন{% else %}সক্রিয় করুন{% endif %}
                 </button>
             </form>
         </div>
@@ -41,7 +41,7 @@
                 <span class="text-xs uppercase tracking-wider text-slate-400 font-bold">বর্তমান সাবস্ক্রিপশন প্ল্যান</span>
                 <div class="text-2xl font-black text-white mt-1">{{ subscription.plan.name }}</div>
                 <div class="text-xs text-emerald-400 font-mono mt-1">
-                    ৳{{ subscription.plan.monthly_price_bdt }}/মাস • মেয়াদ: {{ subscription.expires_at|date:"d M Y" }}
+                    ৳{{ subscription.plan.monthly_price_bdt }}/মাস • মেয়াদ: {{ subscription.expires_at|date:"d M Y" }}
                 </div>
             </div>
 
@@ -50,14 +50,14 @@
                     {% csrf_token %}
                     <input type="hidden" name="action" value="extend_30_days">
                     <button type="submit" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md">
-                        +৩০ দিন মেয়াদ বৃদ্ধি
+                        +৩০ দিন মেয়াদ বৃদ্ধি
                     </button>
                 </form>
                 <form method="POST" action="{% url 'saas_admin:tenant_update_status' tenant.id %}">
                     {% csrf_token %}
                     <input type="hidden" name="action" value="extend_365_days">
                     <button type="submit" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md">
-                        +১ বছর মেয়াদ বৃদ্ধি
+                        +১ বছর মেয়াদ বৃদ্ধি
                     </button>
                 </form>
             </div>
@@ -102,15 +102,15 @@
                 <div class="space-y-2 text-xs text-slate-300">
                     <div class="flex justify-between py-1 border-b border-slate-750">
                         <span class="text-slate-400">DGDA ড্রাগ লাইসেন্স:</span>
-                        <span class="font-mono font-bold text-cyan-300">{{ tenant.drug_license_number|default:"দাখিল করা হয়নি" }}</span>
+                        <span class="font-mono font-bold text-cyan-300">{{ tenant.drug_license_number|default:"দাখিল করা হয়নি" }}</span>
                     </div>
                     <div class="flex justify-between py-1 border-b border-slate-750">
                         <span class="text-slate-400">ট্রেড লাইসেন্স নং:</span>
-                        <span class="font-mono">{{ tenant.trade_license_number|default:"দাখিল করা হয়নি" }}</span>
+                        <span class="font-mono">{{ tenant.trade_license_number|default:"দাখিল করা হয়নি" }}</span>
                     </div>
                     <div class="flex justify-between py-1 border-b border-slate-750">
                         <span class="text-slate-400">BIN / ভ্যাট নিবন্ধন:</span>
-                        <span class="font-mono">{{ tenant.vat_reg_number|default:"দাখিল করা হয়নি" }}</span>
+                        <span class="font-mono">{{ tenant.vat_reg_number|default:"দাখিল করা হয়নি" }}</span>
                     </div>
                     <div class="flex justify-between py-1 border-b border-slate-750">
                         <span class="text-slate-400">ডিফল্ট ভ্যাট হার:</span>
@@ -149,7 +149,7 @@
                             <td class="py-2.5 px-4 font-mono text-cyan-300">{{ s.bmdc_or_pcb_reg_no|default:"-" }}</td>
                         </tr>
                         {% empty %}
-                        <tr><td colspan="4" class="text-center py-4 text-slate-500">কোনো অতিরিক্ত স্টাফ যুক্ত করা হয়নি।</td></tr>
+                        <tr><td colspan="4" class="text-center py-4 text-slate-500">কোনো অতিরিক্ত স্টাফ যুক্ত করা হয়নি।</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>

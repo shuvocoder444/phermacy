@@ -48,7 +48,7 @@
                         @click="selectedCustomer = { id: '{{ c.id }}', name: '{{ c.name|escapejs }}', phone: '{{ c.phone }}', current_due: '{{ c.current_due }}' }; collectDueModal = true;"
                         class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-[11px] shadow-sm transition-colors flex items-center gap-1"
                     >
-                        <span>বাকি আদায়</span>
+                        <span>বাকি আদায়</span>
                     </button>
                     {% endif %}
                     <a href="{% url 'customers:statement' c.id %}" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-bold text-[11px] transition-colors">
@@ -60,7 +60,7 @@
         {% empty %}
         <tr>
             <td colspan="6" class="px-6 py-12 text-center text-slate-400">
-                <p class="text-sm font-semibold">কোন কাস্টমার পাওয়া যায়নি</p>
+                <p class="text-sm font-semibold">কোন কাস্টমার পাওয়া যায়নি</p>
                 <p class="text-xs mt-1 text-slate-400">নতুন কাস্টমার যোগ করতে উপরের বাটনে ক্লিক করুন।</p>
             </td>
         </tr>

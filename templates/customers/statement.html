@@ -3,9 +3,14 @@
 {% block title %}কাস্টমার লেজার স্টেটমেন্ট - {{ customer.name }} | PharmaFlow POS{% endblock %}
 
 {% block content %}
-<div class="flex h-screen bg-slate-50 overflow-hidden font-sans text-slate-800">
+<div class="flex flex-col lg:flex-row h-screen bg-slate-50 overflow-hidden font-sans text-slate-800">
+    <div class="lg:hidden absolute top-0 left-0 right-0 h-14 bg-white border-b border-slate-200 z-40 flex items-center gap-3 px-4 shadow-sm">
+        <a href="{% url 'customers:dashboard' %}" class="shrink-0 p-2 rounded-xl bg-slate-100 text-slate-700" aria-label="কাস্টমার তালিকায় ফিরুন">←</a>
+        <span class="min-w-0 flex-1 truncate text-sm font-bold text-slate-800">{{ customer.name }} — স্টেটমেন্ট</span>
+        <button onclick="window.print()" class="shrink-0 rounded-xl bg-slate-800 px-3 py-2 text-xs font-bold text-white">প্রিন্ট</button>
+    </div>
     <!-- Left Navigation Sidebar -->
-    <aside class="w-64 bg-white border-r border-slate-200 flex flex-col justify-between shrink-0 shadow-sm z-30">
+    <aside class="hidden lg:flex w-64 bg-white border-r border-slate-200 flex-col justify-between shrink-0 shadow-sm z-30">
         <div>
             <!-- Brand Logo -->
             <div class="h-16 flex items-center px-6 border-b border-slate-100 gap-3">
@@ -38,16 +43,16 @@
                     <svg class="w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                     </svg>
-                    <span>আয়-ব্যয় ক্যাশ বুক</span>
+                    <span>আয়-ব্যয় ক্যাশ বুক</span>
                 </a>
             </nav>
         </div>
     </aside>
 
     <!-- Main Content Area -->
-    <main class="flex-1 flex flex-col h-full overflow-hidden">
+    <main class="flex-1 min-h-0 flex flex-col overflow-hidden pt-14 lg:pt-0">
         <!-- Top Bar -->
-        <header class="h-16 bg-white border-b border-slate-200 px-8 flex items-center justify-between shrink-0">
+        <header class="hidden lg:flex h-16 bg-white border-b border-slate-200 px-4 xl:px-8 items-center justify-between gap-3 shrink-0">
             <div class="flex items-center gap-4">
                 <a href="{% url 'customers:dashboard' %}" class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -56,10 +61,10 @@
                 </a>
                 <div>
                     <h2 class="text-lg font-bold text-slate-900">{{ customer.name }} - বাকি খাতা লেজার স্টেটমেন্ট</h2>
-                    <p class="text-xs text-slate-500 font-mono">মোবাইল: {{ customer.phone }} | ঠিকানা: {{ customer.address|default:"ঠিকানা দেওয়া নেই" }}</p>
+                    <p class="text-xs text-slate-500 font-mono">মোবাইল: {{ customer.phone }} | ঠিকানা: {{ customer.address|default:"ঠিকানা দেওয়া নেই" }}</p>
                 </div>
             </div>
-            
+
             <button onclick="window.print()" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-sm transition-colors">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
@@ -89,18 +94,18 @@
         </section>
 
         <!-- Statement Table -->
-        <div class="flex-1 p-6 overflow-y-auto">
-            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="flex-1 min-h-0 p-3 sm:p-6 overflow-y-auto">
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-x-auto">
                 <table class="w-full text-left text-xs">
                     <thead class="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider">
                         <tr>
-                            <th class="px-5 py-3">তারিখ ও সময়</th>
+                            <th class="px-5 py-3">তারিখ ও সময়</th>
                             <th class="px-4 py-3">ট্রানজেকশন বিবরণ</th>
                             <th class="px-4 py-3">রেফারেন্স / TrxID</th>
                             <th class="px-4 py-3 text-right">আগের বাকি</th>
                             <th class="px-4 py-3 text-right">টাকার পরিমাণ</th>
                             <th class="px-4 py-3 text-right">পরের বাকি</th>
-                            <th class="px-5 py-3 text-center">আদায়কারী</th>
+                            <th class="px-5 py-3 text-center">আদায়কারী</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100 font-medium text-slate-700">

@@ -11,67 +11,67 @@
     }
 </style>
 
-<div x-data="{ 
+<div x-data="{
     sidebarOpen: false,
-    addBatchModalOpen: false, 
-    movementModalOpen: false, 
-    movementUrl: '' 
-}" class="h-screen w-full bg-slate-100 flex flex-col md:flex-row overflow-hidden font-sans">
+    addBatchModalOpen: false,
+    movementModalOpen: false,
+    movementUrl: ''
+}" class="h-screen w-full bg-slate-100 flex flex-col lg:flex-row overflow-hidden font-sans">
 
     <!-- Mobile Top Bar with Drawer Toggle -->
-    <div class="md:hidden bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between sticky top-0 z-40 shrink-0">
-        <div class="flex items-center space-x-3">
-            <button 
-                type="button" 
-                @click="sidebarOpen = !sidebarOpen" 
+    <div class="lg:hidden min-h-16 bg-white border-b border-slate-200 px-3 py-2 flex items-center justify-between gap-2 sticky top-0 z-40 shrink-0">
+        <div class="flex min-w-0 flex-1 items-center space-x-2">
+            <button
+                type="button"
+                @click="sidebarOpen = !sidebarOpen"
                 class="p-2 rounded-xl bg-slate-100 text-slate-700 border border-slate-200 hover:text-slate-900"
                 title="মেনু খুলুন">
                 <span class="text-xl leading-none">☰</span>
             </button>
-            <div class="flex items-center space-x-2 truncate">
-                <span class="text-xl">📦</span>
-                <span class="text-sm font-black text-slate-900 truncate">ইনভেন্টরি ও স্টক</span>
+            <div class="flex min-w-0 items-center space-x-2">
+                <span class="text-lg shrink-0">📦</span>
+                <span class="text-xs sm:text-sm font-black leading-tight text-slate-900">ইনভেন্টরি ও ব্যাচ স্টক (FEFO)</span>
             </div>
         </div>
-        <button 
-            type="button" 
+        <button
+            type="button"
             @click="$dispatch('open-stock-in')"
-            class="px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-bold shadow-md">
+            class="shrink-0 px-2.5 py-1.5 rounded-xl bg-emerald-600 text-white text-[11px] font-bold shadow-md">
             ➕ স্টক ইন
         </button>
     </div>
 
     <!-- Mobile Drawer Overlay Backdrop -->
-    <div 
-        x-show="sidebarOpen" 
-        x-cloak 
-        @click="sidebarOpen = false" 
-        class="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden">
+    <div
+        x-show="sidebarOpen"
+        x-cloak
+        @click="sidebarOpen = false"
+        class="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden">
     </div>
 
     <!-- Mobile Drawer Container -->
-    <div 
-        x-show="sidebarOpen" 
-        x-cloak 
-        class="fixed inset-y-0 left-0 z-50 w-72 md:hidden">
+    <div
+        x-show="sidebarOpen"
+        x-cloak
+        class="fixed inset-y-0 left-0 z-50 w-72 lg:hidden">
         {% include "partials/tenant_sidebar.html" with active_tab="inventory" %}
     </div>
 
     <!-- Desktop Sidebar -->
-    <div class="hidden md:block shrink-0 h-screen">
+    <div class="hidden lg:block shrink-0 h-screen">
         {% include "partials/tenant_sidebar.html" with active_tab="inventory" %}
     </div>
 
     <!-- Main Content Area -->
-    <div class="flex-1 h-screen flex flex-col min-w-0 overflow-y-auto bg-slate-100">
+    <div class="flex-1 min-h-0 flex flex-col min-w-0 overflow-y-auto bg-slate-100">
 
         <!-- Top Content Header Bar -->
-        <header class="bg-white border-b border-slate-200 sticky top-0 z-20 px-4 sm:px-8 py-3.5 flex items-center justify-between shadow-xs shrink-0">
+        <header class="hidden lg:flex bg-white border-b border-slate-200 sticky top-0 z-20 px-4 sm:px-8 py-3.5 items-center justify-between shadow-xs shrink-0">
             <div>
                 <h1 class="text-base sm:text-lg font-black text-slate-800 flex items-center space-x-2">
                     <span>📦 ইনভেন্টরি ও ব্যাচ স্টক (FEFO)</span>
                 </h1>
-                <p class="text-xs text-slate-500 font-medium">{{ tenant.name }} • ব্যাচ ভিত্তিক ক্রয়মূল্য ও মেয়াদ ট্র্যাকিং</p>
+                <p class="text-xs text-slate-500 font-medium">{{ tenant.name }} • ব্যাচ ভিত্তিক ক্রয়মূল্য ও মেয়াদ ট্র্যাকিং</p>
             </div>
 
             <div class="flex items-center space-x-2 sm:space-x-3">
@@ -79,8 +79,8 @@
                     <span>⚡</span>
                     <span>POS টার্মিনাল</span>
                 </a>
-                <button 
-                    type="button" 
+                <button
+                    type="button"
                     @click="$dispatch('open-stock-in')"
                     class="px-3.5 sm:px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs sm:text-sm font-extrabold shadow-md shadow-emerald-600/25 transition-all flex items-center space-x-1.5 cursor-pointer">
                     <span>➕</span>
@@ -110,19 +110,19 @@
             <div class="p-4 sm:p-5 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-1">
                 <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">মোট স্টক ইউনিট</span>
                 <div class="text-xl sm:text-2xl font-black text-slate-800">{{ total_units }} <span class="text-xs font-normal text-slate-500">পিস</span></div>
-                <div class="text-[11px] font-semibold text-emerald-600">সক্রিয় ব্যাচ: {{ total_batches }} টি</div>
+                <div class="text-[11px] font-semibold text-emerald-600">সক্রিয় ব্যাচ: {{ total_batches }} টি</div>
             </div>
 
             <!-- Stock Valuation at TP -->
             <div class="p-4 sm:p-5 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-1">
-                <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">মোট ক্রয়মূল্য (TP)</span>
+                <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">মোট ক্রয়মূল্য (TP)</span>
                 <div class="text-xl sm:text-2xl font-black text-slate-800">৳{{ total_tp_value|floatformat:2 }}</div>
                 <div class="text-[11px] font-semibold text-slate-500">ইনভেন্টরি ক্যাপিটাল</div>
             </div>
 
             <!-- Stock Valuation at MRP -->
             <div class="p-4 sm:p-5 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-1">
-                <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">মোট বিক্রয়মূল্য (MRP)</span>
+                <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">মোট বিক্রয়মূল্য (MRP)</span>
                 <div class="text-xl sm:text-2xl font-black text-indigo-700">৳{{ total_mrp_value|floatformat:2 }}</div>
                 <div class="text-[11px] font-semibold text-indigo-600">সম্ভাব্য মোট রেভিনিউ</div>
             </div>
@@ -136,7 +136,7 @@
 
             <!-- Expiring in 60 Days -->
             <div class="p-4 sm:p-5 rounded-3xl bg-rose-50/70 border border-rose-200 shadow-sm space-y-1 col-span-2 lg:col-span-1">
-                <span class="text-[11px] font-bold text-rose-700 uppercase tracking-wider">মেয়াদ শেষের নোটিশ</span>
+                <span class="text-[11px] font-bold text-rose-700 uppercase tracking-wider">মেয়াদ শেষের নোটিশ</span>
                 <div class="text-xl sm:text-2xl font-black text-rose-900">{{ expiring_soon_count }} <span class="text-xs font-normal">ব্যাচ</span></div>
                 <div class="text-[11px] font-semibold text-rose-600">আগামী ৬০ দিনে উত্তীর্ণ</div>
             </div>
@@ -144,15 +144,15 @@
 
         <!-- Filter & Search Toolbar -->
         <div class="p-4 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-3">
-            <div class="flex flex-col md:flex-row gap-3 items-center justify-between">
+            <div class="flex flex-col lg:flex-row gap-3 items-center justify-between">
                 <!-- Search Input -->
-                <div class="w-full md:w-96 relative">
+                <div class="w-full lg:w-96 relative">
                     <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 text-sm">🔍</span>
-                    <input 
-                        type="text" 
-                        name="q" 
+                    <input
+                        type="text"
+                        name="q"
                         value="{{ query }}"
-                        placeholder="ঔষধের নাম, জেনেরিক বা ব্যাচ নম্বর খুঁজুন..." 
+                        placeholder="ঔষধের নাম, জেনেরিক বা ব্যাচ নম্বর খুঁজুন..."
                         hx-get="{% url 'inventory:dashboard' %}"
                         hx-trigger="keyup changed delay:300ms, search"
                         hx-target="#stock-table-container"
@@ -161,22 +161,22 @@
                 </div>
 
                 <!-- Filter Tabs -->
-                <div class="flex flex-wrap items-center gap-1.5 w-full md:w-auto text-xs font-bold">
-                    <a href="?filter=all{% if query %}&q={{ query }}{% endif %}" 
+                <div class="flex flex-wrap items-center gap-1.5 w-full lg:w-auto text-xs font-bold">
+                    <a href="?filter=all{% if query %}&q={{ query }}{% endif %}"
                        class="px-3 py-2 rounded-xl transition-all {% if filter_type == 'all' %}bg-slate-800 text-white{% else %}bg-slate-100 text-slate-600 hover:bg-slate-200{% endif %}">
                         সব ব্যাচ
                     </a>
-                    <a href="?filter=low_stock{% if query %}&q={{ query }}{% endif %}" 
+                    <a href="?filter=low_stock{% if query %}&q={{ query }}{% endif %}"
                        class="px-3 py-2 rounded-xl transition-all {% if filter_type == 'low_stock' %}bg-amber-600 text-white{% else %}bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200{% endif %}">
                         ⚠️ লো স্টক ({{ low_stock_count }})
                     </a>
-                    <a href="?filter=expiring_60{% if query %}&q={{ query }}{% endif %}" 
+                    <a href="?filter=expiring_60{% if query %}&q={{ query }}{% endif %}"
                        class="px-3 py-2 rounded-xl transition-all {% if filter_type == 'expiring_60' %}bg-rose-600 text-white{% else %}bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200{% endif %}">
-                        ⏰ ৬০ দিনে এক্সপায়ার ({{ expiring_soon_count }})
+                        ⏰ ৬০ দিনে এক্সপায়ার ({{ expiring_soon_count }})
                     </a>
-                    <a href="?filter=expired{% if query %}&q={{ query }}{% endif %}" 
+                    <a href="?filter=expired{% if query %}&q={{ query }}{% endif %}"
                        class="px-3 py-2 rounded-xl transition-all {% if filter_type == 'expired' %}bg-red-700 text-white{% else %}bg-slate-100 text-slate-600 hover:bg-slate-200{% endif %}">
-                        ❌ মেয়াদোত্তীর্ণ ({{ expired_count }})
+                        ❌ মেয়াদোত্তীর্ণ ({{ expired_count }})
                     </a>
                 </div>
             </div>

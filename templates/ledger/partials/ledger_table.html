@@ -5,7 +5,7 @@
         <!-- Income Card -->
         <div class="p-5 rounded-3xl bg-white border border-slate-200 shadow-sm flex items-center justify-between">
             <div>
-                <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">আজকের মোট আয় (Income)</span>
+                <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">আজকের মোট আয় (Income)</span>
                 <div class="text-2xl font-black text-emerald-600 font-mono mt-1">৳{{ today_income }}</div>
             </div>
             <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-black text-xl border border-emerald-100">
@@ -16,7 +16,7 @@
         <!-- Expense Card -->
         <div class="p-5 rounded-3xl bg-white border border-slate-200 shadow-sm flex items-center justify-between">
             <div>
-                <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">আজকের মোট ব্যয় (Expense)</span>
+                <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">আজকের মোট ব্যয় (Expense)</span>
                 <div class="text-2xl font-black text-rose-600 font-mono mt-1">৳{{ today_expense }}</div>
             </div>
             <div class="w-12 h-12 rounded-2xl bg-rose-50 text-rose-700 flex items-center justify-center font-black text-xl border border-rose-100">
@@ -67,11 +67,11 @@
                         <td class="p-4">
                             {% if entry.entry_type == 'INCOME' %}
                             <span class="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 text-[11px] font-bold">
-                                + আয় (Income)
+                                + আয় (Income)
                             </span>
                             {% else %}
                             <span class="px-2.5 py-1 rounded-lg bg-rose-50 text-rose-800 border border-rose-200 text-[11px] font-bold">
-                                - ব্যয় (Expense)
+                                - ব্যয় (Expense)
                             </span>
                             {% endif %}
                         </td>
@@ -108,7 +108,7 @@
                     {% empty %}
                     <tr>
                         <td colspan="7" class="p-8 text-center text-slate-400">
-                            কোন আয় বা ব্যয়ের এন্ট্রি পাওয়া যায়নি। উপরের বাটনে ক্লিক করে নতুন এন্ট্রি যুক্ত করুন।
+                            কোন আয় বা ব্যয়ের এন্ট্রি পাওয়া যায়নি। উপরের বাটনে ক্লিক করে নতুন এন্ট্রি যুক্ত করুন।
                         </td>
                     </tr>
                     {% endfor %}

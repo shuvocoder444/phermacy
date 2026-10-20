@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block title %}ফার্মেসি প্রোফাইল ও সেটিংস | {{ tenant.name }}{% endblock %}
+
+{% block content %}
+<div x-data="{ sidebarOpen: false }" class="h-screen w-full bg-slate-100 flex flex-col lg:flex-row overflow-hidden">
+    <header class="lg:hidden bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shrink-0">
+        <button type="button" @click="sidebarOpen = true" class="p-2 rounded-xl bg-slate-100 text-slate-700" aria-label="মেনু খুলুন">☰</button>
+        <span class="font-bold text-slate-800 truncate px-2">{{ tenant.name }}</span>
+        <a href="{% url 'pos:screen' %}" class="px-3 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold">POS</a>
+    </header>
+    <div x-show="sidebarOpen" x-cloak @click="sidebarOpen = false" class="fixed inset-0 z-40 bg-black/60 lg:hidden"></div>
+    <div x-show="sidebarOpen" x-cloak class="fixed inset-y-0 left-0 z-50 w-72 lg:hidden">
+        {% include "partials/tenant_sidebar.html" with active_tab="settings" %}
+    </div>
+    <aside class="hidden lg:block h-screen shrink-0">
+        {% include "partials/tenant_sidebar.html" with active_tab="settings" %}
+    </aside>
+
+        <main class="min-w-0 min-h-0 flex-1 overflow-y-auto">
+        <header class="hidden lg:flex sticky top-0 z-20 bg-white border-b border-slate-200 px-4 sm:px-8 py-4 items-center justify-between gap-3">
+            <div class="min-w-0">
+                <h1 class="font-black text-slate-900 text-lg">⚙️ ফার্মেসি প্রোফাইল ও সেটিংস</h1>
+                <p class="text-xs text-slate-500 truncate">{{ tenant.name }} • {{ tenant.phone }}</p>
+            </div>
+            <a href="{% url 'tenant_dashboard:dashboard' %}" class="shrink-0 px-3 py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold">ড্যাশবোর্ড</a>
+        </header>
+
+        <section class="max-w-4xl mx-auto p-4 sm:p-8 space-y-5">
+            {% if messages %}
+                {% for message in messages %}
+                <div class="rounded-xl border px-4 py-3 text-sm font-semibold {% if message.tags == 'success' %}bg-emerald-50 border-emerald-200 text-emerald-800{% else %}bg-rose-50 border-rose-200 text-rose-800{% endif %}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+
+            <div class="rounded-2xl border border-slate-200 bg-white p-5 sm:p-7 shadow-sm">
+                <div class="mb-5">
+                    <h2 class="text-base font-extrabold text-slate-900">দোকানের তথ্য</h2>
+                    <p class="mt-1 text-xs text-slate-500">রসিদ ও ফার্মেসির প্রোফাইলে ব্যবহৃত তথ্য হালনাগাদ করুন।</p>
+                </div>
+                <form method="POST" enctype="multipart/form-data" action="{% url 'tenant_dashboard:settings_update' %}" class="space-y-5">
+                    {% csrf_token %}
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <label class="text-xs font-bold text-slate-700">ফার্মেসির নাম (English) *
+                            <input type="text" name="name" value="{{ tenant.name }}" required class="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-normal focus:border-emerald-500 focus:outline-none">
+                        </label>
+                        <label class="text-xs font-bold text-slate-700">ফার্মেসির নাম (বাংলা)
+                            <input type="text" name="name_bn" value="{{ tenant.name_bn|default:'' }}" class="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-normal focus:border-emerald-500 focus:outline-none">
+                        </label>
+                        <label class="text-xs font-bold text-slate-700">মোবাইল নম্বর *
+                            <input type="tel" name="phone" value="{{ tenant.phone }}" required class="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-normal focus:border-emerald-500 focus:outline-none">
+                        </label>
+                        <label class="text-xs font-bold text-slate-700">ইমেইল
+                            <input type="email" name="email" value="{{ tenant.email|default:'' }}" class="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-normal focus:border-emerald-500 focus:outline-none">
+                        </label>
+                    </div>
+                    <label class="block text-xs font-bold text-slate-700">দোকানের ঠিকানা
+                        <textarea name="address" rows="3" class="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-normal focus:border-emerald-500 focus:outline-none">{{ tenant.address|default:'' }}</textarea>
+                    </label>
+                    <label class="block text-xs font-bold text-slate-700">ফার্মেসির লোগো (সর্বোচ্চ ২ MB)
+                        <input type="file" name="logo" accept="image/png,image/jpeg,image/webp" class="mt-1 block w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-normal">
+                        {% if tenant.logo %}<img src="{{ tenant.logo.url }}" alt="{{ tenant.name }} logo" class="mt-3 h-14 max-w-48 rounded-lg object-contain">{% endif %}
+                    </label>
+
+                    <div class="border-t border-slate-100 pt-5">
+                        <h2 class="text-sm font-extrabold text-slate-900">লাইসেন্স ও হিসাব</h2>
+                        <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <label class="text-xs font-bold text-slate-700">DGDA ড্রাগ লাইসেন্স নম্বর
+                                <input type="text" name="drug_license_number" value="{{ tenant.drug_license_number|default:'' }}" class="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-normal focus:border-emerald-500 focus:outline-none">
+                            </label>
+                            <label class="text-xs font-bold text-slate-700">ট্রেড লাইসেন্স নম্বর
+                                <input type="text" name="trade_license_number" value="{{ tenant.trade_license_number|default:'' }}" class="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-normal focus:border-emerald-500 focus:outline-none">
+                            </label>
+                            <label class="text-xs font-bold text-slate-700">ভ্যাট BIN নম্বর
+                                <input type="text" name="vat_reg_number" value="{{ tenant.vat_reg_number|default:'' }}" class="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-normal focus:border-emerald-500 focus:outline-none">
+                            </label>
+                            <label class="text-xs font-bold text-slate-700">স্ট্যান্ডার্ড ভ্যাট হার (%)
+                                <input type="number" min="0" max="100" step="0.01" name="default_vat_rate" value="{{ tenant.default_vat_rate }}" class="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-normal focus:border-emerald-500 focus:outline-none">
+                            </label>
+                            <label class="text-xs font-bold text-slate-700 sm:col-span-2">লো-স্টক অ্যালার্ট সীমা (পিস)
+                                <input type="number" min="0" step="1" name="low_stock_threshold" value="{{ tenant.low_stock_threshold }}" class="mt-1 w-full sm:max-w-xs rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-normal focus:border-emerald-500 focus:outline-none">
+                                <span class="mt-1 block font-normal text-slate-400">স্টক এই সংখ্যার নিচে নামলে সতর্কবার্তা দেখাবে।</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="flex justify-end border-t border-slate-100 pt-4">
+                        <button type="submit" class="rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-extrabold text-white shadow hover:bg-emerald-700">পরিবর্তন সংরক্ষণ</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+    </main>
+</div>
+{% endblock %}

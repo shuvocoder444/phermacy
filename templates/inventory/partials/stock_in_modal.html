@@ -9,7 +9,7 @@
     
     <div 
         @click.outside="closeModal()"
-        class="bg-white rounded-t-3xl sm:rounded-3xl border border-slate-200 shadow-2xl max-w-xl w-full overflow-hidden max-h-[92vh] flex flex-col pb-safe">
+        class="bg-white rounded-t-3xl sm:rounded-3xl border border-slate-200 shadow-2xl max-w-xl w-full overflow-hidden max-h-[92dvh] flex flex-col pb-safe">
         
         <!-- Modal Header -->
         <div class="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-teal-50 via-emerald-50 to-white">
@@ -18,8 +18,8 @@
                     📦
                 </div>
                 <div>
-                    <h3 class="font-extrabold text-slate-800 text-base">নতুন ব্যাচ স্টক ইনওয়ার্ড (Stock In)</h3>
-                    <p class="text-xs text-slate-500 font-medium">সাপ্লায়ার চালান বা ক্রয় অনুযায়ী ঔষধের স্টক সিস্টেমে এন্ট্রি দিন</p>
+                    <h3 class="font-extrabold text-slate-800 text-base">নতুন ব্যাচ স্টক ইনওয়ার্ড (Stock In)</h3>
+                    <p class="text-xs text-slate-500 font-medium">সাপ্লায়ার চালান বা ক্রয় অনুযায়ী ঔষধের স্টক সিস্টেমে এন্ট্রি দিন</p>
                 </div>
             </div>
             <button 
@@ -140,7 +140,7 @@
                 <div>
                     <div class="flex items-center justify-between mb-1">
                         <label class="text-xs font-bold text-slate-700">
-                            মেয়াদোত্তীর্ণের তারিখ <span class="text-rose-500">*</span>
+                            মেয়াদোত্তীর্ণের তারিখ <span class="text-rose-500">*</span>
                         </label>
                         <div class="flex items-center space-x-1">
                             <button type="button" @click="setExpiryYears(1)" class="text-[9px] px-1 py-0.5 bg-slate-100 hover:bg-teal-100 rounded text-slate-700 font-bold">+১ বঃ</button>
@@ -221,7 +221,7 @@
                 <div>
                     <div class="flex items-center justify-between mb-1">
                         <label class="text-[11px] font-bold text-slate-700">
-                            খুচরা বিক্রয় দর (MRP ৳)
+                            খুচরা বিক্রয় দর (MRP ৳)
                         </label>
                         <span 
                             x-show="profitMargin > 0" 
@@ -244,7 +244,7 @@
                 <input 
                     type="text" 
                     x-model="challanNo"
-                    placeholder="e.g. SQ-CHALLAN-8890 বা ইনভয়েস নং" 
+                    placeholder="e.g. SQ-CHALLAN-8890 বা ইনভয়েস নং" 
                     class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:bg-white focus:border-teal-500 focus:outline-none">
             </div>
 
@@ -387,7 +387,7 @@ function stockInController() {
 
         async submitForm(continueAdding) {
             if (!this.brandName || !this.batchNumber || !this.expiryDate) {
-                this.errorMsg = 'ঔষধের নাম, ব্যাচ নম্বর এবং মেয়াদোত্তীর্ণের তারিখ পূরণ করুন!';
+                this.errorMsg = 'ঔষধের নাম, ব্যাচ নম্বর এবং মেয়াদোত্তীর্ণের তারিখ পূরণ করুন!';
                 return;
             }
 
@@ -434,7 +434,7 @@ function stockInController() {
                         playCartAddSound();
                     }
 
-                    this.successMsg = data.message || 'স্টক সফলভাবে ইনওয়ার্ড হয়েছে!';
+                    this.successMsg = data.message || 'স্টক সফলভাবে ইনওয়ার্ড হয়েছে!';
                     
                     if (continueAdding) {
                         // Reset for next medicine
@@ -452,10 +452,10 @@ function stockInController() {
                         }, 900);
                     }
                 } else {
-                    this.errorMsg = data.message || 'স্টক যোগ করতে ত্রুটি হয়েছে।';
+                    this.errorMsg = data.message || 'স্টক যোগ করতে ত্রুটি হয়েছে।';
                 }
             } catch(e) {
-                this.errorMsg = 'সার্ভার যোগাযোগে সমস্যা হয়েছে। আবার চেষ্টা করুন।';
+                this.errorMsg = 'সার্ভার যোগাযোগে সমস্যা হয়েছে। আবার চেষ্টা করুন।';
             } finally {
                 this.isSubmitting = false;
             }

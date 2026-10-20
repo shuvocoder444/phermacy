@@ -4,9 +4,7 @@
     <!-- Sidebar Header / Pharmacy Branding -->
     <div class="p-5 border-b border-slate-800 flex items-center justify-between shrink-0">
         <a href="{% url 'tenant_dashboard:dashboard' %}" class="flex items-center space-x-3 group overflow-hidden">
-            <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 via-teal-600 to-cyan-500 flex items-center justify-center text-white font-black text-xl shadow-lg shadow-emerald-600/25 shrink-0 group-hover:scale-105 transition-transform">
-                +
-            </div>
+            {% if tenant.logo %}<img src="{{ tenant.logo.url }}" alt="{{ tenant.name }} logo" class="w-10 h-10 rounded-2xl object-contain bg-white p-1 shrink-0">{% elif request.tenant.logo %}<img src="{{ request.tenant.logo.url }}" alt="{{ request.tenant.name }} logo" class="w-10 h-10 rounded-2xl object-contain bg-white p-1 shrink-0">{% else %}<div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 via-teal-600 to-cyan-500 flex items-center justify-center text-white font-black text-xl shadow-lg shadow-emerald-600/25 shrink-0 group-hover:scale-105 transition-transform">+</div>{% endif %}
             <div class="truncate">
                 <div class="flex items-center space-x-1.5">
                     <span class="text-sm font-extrabold tracking-tight text-white truncate">{% if tenant.name %}{{ tenant.name }}{% elif request.tenant.name %}{{ request.tenant.name }}{% else %}ফার্মেসি শাখা{% endif %}</span>
@@ -33,7 +31,7 @@
         <div class="flex items-center space-x-2">
             <span class="w-2 h-2 rounded-full {% if tenant.is_active or request.tenant.is_active %}bg-emerald-500 animate-pulse{% else %}bg-rose-500{% endif %}"></span>
             <span class="text-[11px] font-bold text-slate-300">
-                {% if tenant.is_active or request.tenant.is_active %}সক্রিয় ফার্মেসি{% else %}স্থগিত (Suspended){% endif %}
+                {% if tenant.is_active or request.tenant.is_active %}সক্রিয় ফার্মেসি{% else %}স্থগিত (Suspended){% endif %}
             </span>
         </div>
         <span class="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
@@ -88,7 +86,7 @@
         <a href="{% url 'ledger:dashboard' %}" 
            class="flex items-center space-x-3 px-3.5 py-3 rounded-2xl transition-all {% if active_tab == 'ledger' %}bg-emerald-600 text-white shadow-lg shadow-emerald-600/30 font-black{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
             <span class="text-base">📒</span>
-            <span>আয়-ব্যয় হিসাব লেজার</span>
+            <span>আয়-ব্যয় হিসাব লেজার</span>
         </a>
 
         <div class="pt-3 text-[10px] uppercase font-black tracking-wider text-slate-500 px-3 py-1">
@@ -96,22 +94,16 @@
         </div>
 
         <!-- 6. Subscription & Billing -->
-        <button 
-            type="button" 
-            @click="upgradeModalOpen = true"
-            class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-2xl text-slate-300 hover:bg-indigo-950/40 hover:text-indigo-300 border border-transparent hover:border-indigo-500/20 transition-all text-left">
+        <a href="{% url 'tenant_dashboard:subscription' %}" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-2xl {% if active_tab == 'subscription' %}bg-indigo-950/40 text-indigo-300 border border-indigo-500/20{% else %}text-slate-300 border border-transparent hover:bg-indigo-950/40 hover:text-indigo-300 hover:border-indigo-500/20{% endif %} transition-all text-left">
             <span class="text-base">💎</span>
             <span>সাবস্ক্রিপশন প্ল্যান</span>
-        </button>
+        </a>
 
         <!-- 7. Pharmacy Settings -->
-        <button 
-            type="button" 
-            @click="settingsModalOpen = true"
-            class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-2xl text-slate-300 hover:bg-slate-800 hover:text-white transition-all text-left">
+        <a href="{% url 'tenant_dashboard:settings' %}" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-2xl {% if active_tab == 'settings' %}bg-slate-800 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %} transition-all text-left">
             <span class="text-base">⚙️</span>
             <span>ফার্মেসি প্রোফাইল ও সেটিংস</span>
-        </button>
+        </a>
 
         <!-- Super Admin switch if user is superuser -->
         {% if request.user.is_superuser %}
