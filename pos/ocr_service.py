@@ -264,10 +264,12 @@ def _gemini_scan_response(request, raw_bytes: bytes):
     if not GeminiAIService.is_gemini_active():
         return None
     try:
+        tenant = getattr(request, "tenant", None)
+        tenant_key = str(tenant.id) if tenant else None
         result = GeminiAIService.analyze_medicine_image(raw_bytes)
         if not result or not (result.get("brand_name") or result.get("generic_name")):
             return None
-        matches = GeminiAIService.match_drug_from_gemini(result)
+        matches = GeminiAIService.match_drug_from_gemini(result, tenant_key=tenant_key)
 
         primary_brand = (result.get("brand_name") or "").strip()
         if matches:

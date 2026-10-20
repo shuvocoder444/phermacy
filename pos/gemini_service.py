@@ -278,7 +278,7 @@ class GeminiAIService:
 
         # Vision is an optional assist; keep its worst-case delay bounded so a
         # slow provider does not stall the cashier for two full model timeouts.
-        success, data = cls._execute_gemini_request(api_key, payload, timeout=8)
+        success, data = cls._execute_gemini_request(api_key, payload, timeout=15)
         if not success or not isinstance(data, dict):
             logger.error("Gemini Vision analysis failed: %s", data)
             return None
@@ -297,7 +297,7 @@ class GeminiAIService:
             except (TypeError, ValueError):
                 confidence = 0
             # Medicine identity is safety-sensitive; reject weak visual guesses.
-            if confidence < 0.85:
+            if not parsed.get('brand_name') or (confidence > 0 and confidence < 0.50):
                 return None
             return parsed
         except Exception as e:
