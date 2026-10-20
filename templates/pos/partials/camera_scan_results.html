@@ -96,46 +96,55 @@
         {% endfor %}
     </div>
 </div>
-{% else %}
-<div class="p-3 sm:p-5 text-center text-slate-600 bg-white rounded-2xl border border-slate-200 space-y-3">
-    {% if gemini_result and primary_brand_name %}
-    <div class="p-3.5 sm:p-4 bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 border-2 border-indigo-400 rounded-2xl shadow-sm text-left space-y-2.5">
+{% elif gemini_result and primary_brand_name %}
+<div class="space-y-3 p-1 sm:p-2">
+    <!-- Big Prominent Gemini Detected Medicine Card -->
+    <div class="p-4 sm:p-5 bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 border-2 border-indigo-400 rounded-2xl shadow-sm text-left space-y-3">
         <div class="flex items-center justify-between">
-            <span class="text-xs font-bold text-indigo-900 flex items-center gap-1">
-                <span>✨</span> <strong>Gemini AI Vision</strong> দ্বারা নির্ভুলভাবে শনাক্তকৃত:
+            <span class="text-xs font-bold text-indigo-950 flex items-center gap-1.5">
+                <span class="text-base">✨</span> <strong>Gemini AI Vision</strong> দ্বারা নির্ভুলভাবে শনাক্তকৃত
             </span>
-            <span class="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 text-[10px] font-bold">নতুন ওষুধ</span>
+            <span class="px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-800 text-[10px] font-bold">নতুন ওষুধ</span>
         </div>
-        <div class="text-base sm:text-lg font-black text-slate-900 font-mono flex items-center gap-2">
-            <span>{{ primary_brand_name }}</span>
-            {% if gemini_result.strength %}
-            <span class="text-xs px-2 py-0.5 bg-white border border-indigo-200 rounded-md font-bold text-indigo-700">{{ gemini_result.strength }}</span>
-            {% endif %}
-            {% if gemini_result.dosage_form %}
-            <span class="text-[11px] px-2 py-0.5 bg-indigo-100 text-indigo-800 rounded-md font-bold">{{ gemini_result.dosage_form }}</span>
-            {% endif %}
+        
+        <div class="flex items-start justify-between gap-3">
+            <div>
+                <div class="text-lg sm:text-xl font-black text-slate-900 font-mono flex flex-wrap items-center gap-2">
+                    <span>{{ primary_brand_name }}</span>
+                    {% if gemini_result.strength %}
+                    <span class="text-xs px-2 py-0.5 bg-white border border-indigo-200 rounded-md font-bold text-indigo-700 font-mono">{{ gemini_result.strength }}</span>
+                    {% endif %}
+                    {% if gemini_result.dosage_form %}
+                    <span class="text-[11px] px-2 py-0.5 bg-indigo-100 text-indigo-800 rounded-md font-bold">{{ gemini_result.dosage_form }}</span>
+                    {% endif %}
+                </div>
+                <div class="text-xs text-slate-600 mt-1">
+                    <span class="font-bold text-indigo-800">জেনেরিক:</span> {{ gemini_result.generic_name|default:"N/A" }} • 
+                    <span class="font-bold text-indigo-800">কোম্পানি:</span> {{ gemini_result.manufacturer|default:"N/A" }}
+                </div>
+            </div>
         </div>
-        <div class="text-xs text-slate-600">
-            <span class="font-bold text-indigo-700">জেনেরিক:</span> {{ gemini_result.generic_name|default:"N/A" }} • 
-            <span class="font-bold text-indigo-700">কোম্পানি:</span> {{ gemini_result.manufacturer|default:"N/A" }}
-        </div>
-        <div class="pt-1 flex flex-wrap gap-2">
+
+        <div class="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 border-t border-indigo-100/60">
             <button 
                 type="button" 
                 @click="openAddDrugModal('{{ primary_brand_name|escapejs }}', '{{ gemini_result.generic_name|default:''|escapejs }}', '{{ gemini_result.strength|default:''|escapejs }}', '{{ gemini_result.manufacturer|default:''|escapejs }}', '{{ gemini_result.dosage_form|default:'Tablet'|escapejs }}'); cameraModalOpen = false; stopCamera();"
-                class="px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-extrabold rounded-xl text-xs shadow-md shadow-indigo-600/25 flex items-center gap-1.5 transition-all active:scale-95">
+                class="px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-extrabold rounded-xl text-xs sm:text-sm shadow-md shadow-indigo-600/30 flex items-center justify-center gap-1.5 transition-all active:scale-95">
                 <span>➕</span>
                 <span>এই ওষুধটি ইনভেন্টরি ও কার্টে যুক্ত করুন</span>
             </button>
             <button 
                 type="button" 
                 @click="sendDetectedToSearch('{{ primary_brand_name|escapejs }}')"
-                class="px-3.5 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-bold rounded-xl text-xs transition-all flex items-center gap-1 active:scale-95">
+                class="px-3.5 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-1 active:scale-95">
                 <span>🔍 মূল ক্যাটালগে খুঁজুন</span>
             </button>
         </div>
     </div>
-    {% elif primary_brand_name %}
+</div>
+{% else %}
+<div class="p-3 sm:p-5 text-center text-slate-600 bg-white rounded-2xl border border-slate-200 space-y-3">
+    {% if primary_brand_name %}
     <div class="p-3.5 sm:p-4 bg-gradient-to-r from-emerald-50 via-teal-50 to-cyan-50 border-2 border-emerald-500 rounded-2xl shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 text-left">
         <div class="flex items-center space-x-3 min-w-0">
             <div class="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-emerald-500/15 border border-emerald-500/20 text-emerald-700 flex items-center justify-center text-xl shrink-0">

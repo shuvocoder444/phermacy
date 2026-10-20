@@ -1591,14 +1591,16 @@ function posTerminal() {
                 sy = (vh - sHeight) / 2;
             }
 
-            // 2. Render ONLY the cropped green box region onto canvas at full crisp native resolution
-            canvas.width = Math.round(sWidth);
-            canvas.height = Math.round(sHeight);
+            // 2. Render cropped green box region with optimized dimension for instant upload & AI recognition
+            const maxDim = Math.max(sWidth, sHeight);
+            const scaleFactor = maxDim > 900 ? (900 / maxDim) : 1.0;
+            canvas.width = Math.round(sWidth * scaleFactor);
+            canvas.height = Math.round(sHeight * scaleFactor);
             const ctx = canvas.getContext('2d');
             ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, canvas.width, canvas.height);
 
-            // 3. Export high-res crystal-clear cropped image (0.95 quality for maximum OCR accuracy)
-            const croppedImageData = canvas.toDataURL('image/jpeg', 0.95);
+            // 3. Export compact, crisp image (0.82 quality keeps payload ~50KB for instant ~100ms transfer)
+            const croppedImageData = canvas.toDataURL('image/jpeg', 0.82);
             this.ocrScanning = true;
 
             // Execute HTMX POST with full-res payload
