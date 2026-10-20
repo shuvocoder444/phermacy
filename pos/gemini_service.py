@@ -23,10 +23,11 @@ logger = logging.getLogger(__name__)
 AI_CONFIG_PATH = os.path.join(settings.BASE_DIR, "media", "ai_config.json")
 CACHE_KEY_AI_CONFIG = "pos:ai_system_config"
 GEMINI_MODELS = [
+    "gemini-2.5-flash",
+    "gemini-flash-latest",
     "gemini-2.0-flash",
-    "gemini-2.0-flash-lite",
+    "gemini-2.5-flash-lite",
     "gemini-1.5-flash",
-    "gemini-1.5-flash-8b",
 ]
 
 
@@ -54,7 +55,7 @@ class GeminiAIService:
         }
 
         last_error = ""
-        for model in GEMINI_MODELS:
+        for model in GEMINI_MODELS[:2]:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={clean_key}"
             try:
                 resp = requests.post(url, headers=headers, json=payload, timeout=timeout)

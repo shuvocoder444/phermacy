@@ -265,6 +265,21 @@ def voice_medicine_search(request):
                 if fefo_b:
                     batch_id = str(fefo_b.id)
 
+        # ==============================================================
+    # STEP 4.5: Phonetic Soundex & Metaphone Ranking Fallback
+    # ==============================================================
+    if not matched_drug:
+        all_brands = get_all_active_brands_cached()
+        ranked = rank_phonetic_matches(drug_query, all_brands, top_n=3)
+        if ranked:
+            best_brand_name, score = ranked[0]
+            matched_drug = _find_best_variant_for_form(best_brand_name, requested_form)
+            if matched_drug:
+                matched_brand_name = matched_drug.brand_name
+                fefo_b = matched_drug.batches.fefo().first() or matched_drug.batches.order_by("-expiry_date").first()
+                if fefo_b:
+                    batch_id = str(fefo_b.id)
+
     # ==============================================================
     # STEP 5: Gemini AI Multimodal Voice Parser (Advanced Fallback Only)
     # ==============================================================

@@ -73,46 +73,26 @@ def _safe_partial_ratio(s1: str, s2: str) -> int:
         return 0
     if fuzz is not None and hasattr(fuzz, 'partial_ratio'):
         try:
-            return _safe_partial_ratio(s1, s2)
+            return fuzz.partial_ratio(s1, s2)
         except Exception:
             pass
-    s1_low = s1.lower()
-    s2_low = s2.lower()
-    if s1_low in s2_low or s2_low in s1_low:
-        return 90
     import difflib
-    return int(difflib.SequenceMatcher(None, s1_low, s2_low).ratio() * 100)
+    return int(difflib.SequenceMatcher(None, s1.lower(), s2.lower()).ratio() * 100)
 
 
 def rank_drugs_with_multi_signal(clean_text: str, all_drugs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
-    Intelligent Multi-Signal Drug Ranking Algorithm (Pre-filtered for sub-millisecond execution):
-    - Eliminates false-positive 2-3 letter noise words.
-    - Pre-filters candidate drugs by token overlap, reducing 40,000 checks down to ~30 relevant drugs.
-    - Multi-token brand prioritization.
+    Intelligent Multi-Signal Drug Ranking Algorithm:
+    - Eliminates false-positive 2-3 letter noise words (e.g. AX, APT, OR, TIE).
+    - Multi-token brand prioritization (e.g. Entacyd Plus over Entacyd if combination evidence exists).
+    - Chemical / Generic co-occurrence detection (e.g. Simethicone, Paracetamol).
+    - Strength & Dosage form disambiguation (e.g. Chewable Tablet vs Suspension).
     """
     ocr_lower = clean_text.lower()
     ocr_tokens = set(re.findall(r"[a-zA-Z0-9]+", ocr_lower))
-    valid_tokens = [t for t in ocr_tokens if len(t) >= 3 and t not in STOP_WORDS]
-    
-    if not valid_tokens:
-        valid_tokens = [t for t in ocr_tokens if len(t) >= 2]
-    
-    # Ultra-fast candidate pre-filtering: only score drugs matching OCR tokens
-    candidates_to_score = []
-    for d in all_drugs:
-        b_low = d["brand_name"].lower()
-        if any(tok in b_low for tok in valid_tokens):
-            candidates_to_score.append(d)
-        elif d.get("generic__name") and any(tok in d["generic__name"].lower() for tok in valid_tokens):
-            candidates_to_score.append(d)
-            
-    # Fallback to top sample if filter was too strict
-    if not candidates_to_score:
-        candidates_to_score = all_drugs[:100]
-
     scored_candidates = []
-    for d in candidates_to_score:
+
+    for d in all_drugs:
         b_name = d["brand_name"]
         b_lower = b_name.lower().strip()
         b_tokens = [t for t in re.findall(r"[a-zA-Z0-9]+", b_lower) if len(t) >= 2]
@@ -207,7 +187,7 @@ def scan_medicine_ocr(request):
     """
     Enterprise Pharmacy POS Camera OCR Scanner:
     1. Decodes uploaded image (file or base64 canvas snapshot).
-    2. Priority 1: Google Gemini 1.5 Flash Vision Multimodal AI (if active).
+    2. Priority 1: Google Gemini Flash Vision Multimodal AI (if active).
     3. Priority 2: High-contrast Tesseract multi-pass & EasyOCR deep learning.
     4. Self-Learning: Checks user-taught custom aliases.
     5. Multi-Signal Composite Ranker with FEFO Batch & Stock enrichment.
@@ -238,7 +218,7 @@ def scan_medicine_ocr(request):
             return JsonResponse({"status": "failed", "message": "ভুল ইমেজ ফরম্যাট"})
 
         # ==============================================================
-        # PRIORITY 1: Google Gemini 1.5 Flash Vision Multimodal Engine
+        # PRIORITY 1: Google Gemini Flash Vision Multimodal Engine
         # ==============================================================
         if GeminiAIService.is_gemini_active():
             try:
@@ -285,42 +265,51 @@ def scan_medicine_ocr(request):
                 logger.warning("Gemini Vision processing error: %s", gemini_err)
 
         # ==============================================================
-        # PRIORITY 2: Local High-Speed Real-Time OCR Pipeline (<200ms)
+        # PRIORITY 2: Local Enhanced Multi-Pass OCR Pipeline
+        # (Proven accurate on foil strips, bottles, and packaging)
         # ==============================================================
-        # Normalize image size (max 900px width) for instant CPU OCR
-        h, w = img.shape[:2]
-        if w > 900:
-            scale = 900.0 / w
-            img_proc = cv2.resize(img, (900, int(h * scale)), interpolation=cv2.INTER_AREA)
-        else:
-            img_proc = img
-
+        img_resized = cv2.resize(img, None, fx=2.0, fy=2.0, interpolation=cv2.INTER_CUBIC)
         extracted_text = ""
 
-        # Pass 1 (Ultra-fast): Grayscale + Normalized Contrast with --psm 6
+        # Pass 1: Raw color image with --psm 3
         try:
-            gray = cv2.cvtColor(img_proc, cv2.COLOR_BGR2GRAY)
-            norm_gray = cv2.normalize(gray, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX)
-            extracted_text = pytesseract.image_to_string(norm_gray, config='--oem 1 --psm 6 -l eng')
+            extracted_text = pytesseract.image_to_string(img_resized, config='--psm 3 -l eng')
         except Exception as e1:
-            logger.debug("Tesseract PSM 6 failed: %s", e1)
+            logger.debug("Tesseract PSM 3 failed: %s", e1)
 
-        # Pass 2: Color Image with --psm 3 (if pass 1 text too short)
-        if len(extracted_text.strip()) < 3:
+        # Pass 2: Grayscale with --psm 11
+        if not extracted_text.strip():
             try:
-                extracted_text = pytesseract.image_to_string(img_proc, config='--oem 1 --psm 3 -l eng')
+                gray = cv2.cvtColor(img_resized, cv2.COLOR_BGR2GRAY)
+                extracted_text = pytesseract.image_to_string(gray, config='--psm 11 -l eng')
             except Exception as e2:
-                logger.debug("Tesseract PSM 3 failed: %s", e2)
+                logger.debug("Tesseract PSM 11 grayscale failed: %s", e2)
 
-        # Pass 3: High-contrast CLAHE thresholding (fallback only)
-        if len(extracted_text.strip()) < 3:
+        # Pass 3: Blue ink isolation (Red channel CLAHE + Adaptive Gaussian Thresholding)
+        if not extracted_text.strip():
             try:
-                clahe = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(8, 8))
-                contrast = clahe.apply(gray)
-                _, thresh = cv2.threshold(contrast, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-                extracted_text = pytesseract.image_to_string(thresh, config='--oem 1 --psm 6 -l eng')
+                _, _, r_channel = cv2.split(img_resized)
+                clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+                contrast_red = clahe.apply(r_channel)
+                denoised = cv2.medianBlur(contrast_red, 3)
+                thresh = cv2.adaptiveThreshold(
+                    denoised, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 21, 10
+                )
+                if np.mean(thresh) < 127:
+                    thresh = cv2.bitwise_not(thresh)
+                extracted_text = pytesseract.image_to_string(thresh, config='--psm 11 -l eng')
             except Exception as e3:
-                logger.debug("Tesseract threshold fallback failed: %s", e3)
+                logger.debug("Tesseract threshold preprocessing failed: %s", e3)
+
+        # Pass 4: EasyOCR deep learning model (fallback)
+        if not extracted_text.strip():
+            try:
+                reader = get_easyocr_reader()
+                if reader:
+                    easy_res = reader.readtext(img_resized, detail=0)
+                    extracted_text = " ".join(easy_res)
+            except Exception as e4:
+                logger.debug("EasyOCR fallback failed: %s", e4)
 
         clean_text = extracted_text.strip()
         safe_log_text = clean_text.encode('ascii', errors='backslashreplace').decode('ascii')
@@ -339,7 +328,7 @@ def scan_medicine_ocr(request):
                 "raw_text": ""
             })
 
-        # Load active medicines from in-memory cache
+        # Load active medicines from cache for fast access
         cache_key_meds = "pos:all_active_drugs_ocr_cache"
         medicines = cache.get(cache_key_meds)
         if not medicines:
@@ -373,13 +362,13 @@ def scan_medicine_ocr(request):
                 c['ai_engine'] = 'trained'
                 matched_items.append(c)
 
-        # Multi-signal intelligent scoring
+        # Multi-signal intelligent scoring (full accurate ranking)
         ranked_local = rank_drugs_with_multi_signal(clean_text, medicines)
         for rk in ranked_local:
             if not any(it['id'] == rk['id'] for it in matched_items):
                 matched_items.append(rk)
 
-        # Enrich with live FEFO batch in a single batch query (Zero N+1)
+        # Enrich with live FEFO batch in batch query (Zero N+1)
         top_drugs = []
         top_candidates = matched_items[:6]
         top_ids = [it['id'] for it in top_candidates]

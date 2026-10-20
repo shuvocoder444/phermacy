@@ -1597,29 +1597,17 @@ function posTerminal() {
                 sy = (vh - sHeight) / 2;
             }
 
-            // 2. Downscale smartly to optimal OCR resolution (max 900px width/height)
-            let outW = Math.round(sWidth);
-            let outH = Math.round(sHeight);
-            const maxDimension = 900;
-            if (outW > maxDimension || outH > maxDimension) {
-                if (outW > outH) {
-                    outH = Math.round((outH * maxDimension) / outW);
-                    outW = maxDimension;
-                } else {
-                    outW = Math.round((outW * maxDimension) / outH);
-                    outH = maxDimension;
-                }
-            }
-            canvas.width = Math.max(320, outW);
-            canvas.height = Math.max(160, outH);
+            // 2. Render ONLY the cropped green box region onto canvas at full crisp native resolution
+            canvas.width = Math.round(sWidth);
+            canvas.height = Math.round(sHeight);
             const ctx = canvas.getContext('2d');
             ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, canvas.width, canvas.height);
 
-            // 3. Export optimized lightweight JPEG payload (only ~60-90KB for instant transmission)
-            const croppedImageData = canvas.toDataURL('image/jpeg', 0.82);
+            // 3. Export high-res crystal-clear cropped image (0.95 quality for maximum OCR accuracy)
+            const croppedImageData = canvas.toDataURL('image/jpeg', 0.95);
             this.ocrScanning = true;
 
-            // Execute HTMX POST with optimized lightweight payload
+            // Execute HTMX POST with full-res payload
             htmx.ajax('POST', "{% url 'pos:camera_scan' %}", {
                 target: '#camera-scan-results-box',
                 swap: 'innerHTML',
