@@ -881,11 +881,15 @@
                             <span>↗</span>
                         </a>
                     </div>
+                    <div x-show="savedApiKeyMasked" class="mb-2 p-2.5 bg-slate-100 rounded-xl flex items-center justify-between text-[11px]">
+                        <span class="text-slate-600">সংরক্ষিত Key: <strong class="font-mono text-slate-800" x-text="savedApiKeyMasked"></strong></span>
+                        <span class="px-2 py-0.5 bg-emerald-100 text-emerald-800 font-bold rounded-md">✓ সেভ আছে</span>
+                    </div>
                     <div class="relative">
                         <input
                             :type="showApiKey ? 'text' : 'password'"
                             x-model="geminiApiKey"
-                            placeholder="AIzaSy... (আপনার Gemini API কী এখানে পেস্ট করুন)"
+                            placeholder="নতুন Key সেট করতে এখানে পেস্ট করুন (যেমন: AIzaSy...)"
                             class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 pr-16 text-xs font-mono font-bold text-slate-800 focus:ring-2 focus:ring-purple-500 focus:outline-none">
                         <button
                             type="button"
@@ -1020,6 +1024,7 @@ function posTerminal() {
         trainSuccessMsg: '',
         trainErrorMsg: '',
         aiModalOpen: false,
+        savedApiKeyMasked: '',
         geminiApiKey: '',
         showApiKey: false,
         isAiActive: false,
@@ -1426,15 +1431,14 @@ function posTerminal() {
 
         async openAiConfigModal() {
             this.aiTestMsg = '';
+            this.geminiApiKey = '';
             try {
                 const resp = await fetch("{% url 'pos:ai_config' %}");
                 const data = await resp.json();
                 if (data.status === 'success') {
                     this.isAiActive = !!data.is_active;
                     this.aiEnginePreference = data.preferred_engine || 'gemini';
-                    if (data.has_key) {
-                        this.geminiApiKey = data.masked_key;
-                    }
+                    this.savedApiKeyMasked = data.has_key ? data.masked_key : '';
                 }
             } catch (e){}
             this.aiModalOpen = true;

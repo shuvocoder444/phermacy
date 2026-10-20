@@ -20,9 +20,11 @@ AI_CONFIG_PATH = os.path.join(settings.BASE_DIR, "media", "ai_config.json")
 ENV_FILE_PATH = os.path.join(settings.BASE_DIR, ".env")
 CACHE_KEY_AI_CONFIG = "pos:ai_system_config"
 GEMINI_MODELS = [
-    "gemini-1.5-flash",
-    "gemini-2.0-flash",
-    "gemini-1.5-pro",
+    "gemini-3.5-flash",
+    "gemini-flash-latest",
+    "gemini-2.5-flash",
+    "gemini-3.5-flash-lite",
+    "gemini-3.8-flash",
 ]
 
 
@@ -203,7 +205,7 @@ class GeminiAIService:
     @classmethod
     def test_gemini_connection(cls, api_key: Optional[str] = None) -> Tuple[bool, str]:
         """Tests if the given or configured Gemini API key is valid."""
-        key = api_key.strip() if api_key else cls.get_api_key()
+        key = api_key.strip() if (api_key and "..." not in api_key) else cls.get_api_key()
         if not key:
             return False, "কোনো API Key প্রদান করা হয়নি।"
 
@@ -279,7 +281,7 @@ class GeminiAIService:
 
         # Vision is an optional assist; keep its worst-case delay bounded so a
         # slow provider does not stall the cashier for two full model timeouts.
-        success, data = cls._execute_gemini_request(api_key, payload, timeout=4)
+        success, data = cls._execute_gemini_request(api_key, payload, timeout=12)
         if not success or not isinstance(data, dict):
             logger.error("Gemini Vision analysis failed: %s", data)
             return None

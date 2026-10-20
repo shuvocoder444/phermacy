@@ -765,6 +765,8 @@ def test_gemini_connection_view(request):
     """
     from pos.gemini_service import GeminiAIService
     api_key = request.POST.get("gemini_api_key", "").strip()
+    if not api_key or "..." in api_key:
+        api_key = GeminiAIService.get_api_key()
     success, msg = GeminiAIService.test_gemini_connection(api_key=api_key)
     return JsonResponse({
         "status": "success" if success else "failed",
