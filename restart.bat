@@ -1,3 +1,2 @@
 @echo off
-python d:\phermacy\restart_live.py
-
+python d:\phermacy\live.py restart
