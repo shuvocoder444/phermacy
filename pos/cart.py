@@ -69,7 +69,9 @@ class POSCartManager:
         requested = {}
         for batch_id, quantity in batch_quantities:
             requested[str(batch_id)] = requested.get(str(batch_id), 0) + max(0, int(quantity))
-        batches = DrugBatch.objects.filter(id__in=requested).select_related(
+        batches = DrugBatch.objects.filter(
+            id__in=requested, tenant_id=self.tenant_id
+        ).select_related(
             "drug", "drug__dosage_form"
         )
         batch_map = {str(batch.id): batch for batch in batches}

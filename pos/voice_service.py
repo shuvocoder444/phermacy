@@ -18,6 +18,7 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
+from core.decorators import tenant_user_required
 
 from inventory.models import BrandDrug
 from inventory.services import DrugSearchAndCacheService
@@ -134,26 +135,27 @@ def parse_voice_command(text: str) -> tuple[str, Optional[str], int]:
     return cleaned_query or text_normalized, requested_dosage_form, max(1, extracted_qty)
 
 
-def get_all_active_brands_cached() -> list[str]:
+def get_all_active_brands_cached(tenant_id: str) -> list[str]:
     """Fetches list of active brand names cached in memory."""
-    cache_key = "pos:all_active_brand_names"
+    cache_key = f"pos:all_active_brand_names:{tenant_id}"
     brands = cache.get(cache_key)
     if not brands:
         brands = list(
-            BrandDrug.objects.filter(is_active=True)
+            BrandDrug.objects.filter(Q(tenant__isnull=True) | Q(tenant_id=tenant_id), is_active=True)
             .values_list("brand_name", flat=True)
         )
         cache.set(cache_key, brands, 3600)
     return brands
 
 
-def _find_best_variant_for_form(brand_name: str, requested_form: Optional[str]) -> Optional[BrandDrug]:
+def _find_best_variant_for_form(brand_name: str, requested_form: Optional[str], tenant_id: str) -> Optional[BrandDrug]:
     """
     Finds the exact matching drug variant for a brand by requested dosage form (e.g. Syrup vs Tablet).
     """
-    candidates = list(BrandDrug.objects.filter(brand_name__iexact=brand_name, is_active=True))
+    accessible = Q(tenant__isnull=True) | Q(tenant_id=tenant_id)
+    candidates = list(BrandDrug.objects.filter(accessible, brand_name__iexact=brand_name, is_active=True))
     if not candidates:
-        candidates = list(BrandDrug.objects.filter(brand_name__icontains=brand_name, is_active=True))
+        candidates = list(BrandDrug.objects.filter(accessible, brand_name__icontains=brand_name, is_active=True))
     if not candidates:
         return None
 
@@ -166,13 +168,14 @@ def _find_best_variant_for_form(brand_name: str, requested_form: Optional[str]) 
 
     # Fallback to candidate with stock or first candidate
     for c in candidates:
-        if c.total_stock > 0:
+        if c.batches.filter(tenant_id=tenant_id).fefo().exists():
             return c
     return candidates[0]
 
 
 @csrf_exempt
 @require_POST
+@tenant_user_required
 def voice_medicine_search(request):
     """
     Processes spoken medicine commands with intelligent dosage form disambiguation:
@@ -203,13 +206,13 @@ def voice_medicine_search(request):
     from pos.gemini_service import GeminiAIService
     from pos.training_service import DrugTrainingService
 
-    trained_brand = DrugTrainingService.find_match(drug_query)
+    trained_brand = DrugTrainingService.find_match(drug_query, tenant_key)
     if trained_brand:
-        trained_drug = _find_best_variant_for_form(trained_brand, requested_form)
+        trained_drug = _find_best_variant_for_form(trained_brand, requested_form, tenant_key)
         if trained_drug:
             matched_drug = trained_drug
             matched_brand_name = trained_drug.brand_name
-            fefo_b = trained_drug.batches.fefo().first() or trained_drug.batches.order_by("-expiry_date").first()
+            fefo_b = trained_drug.batches.filter(tenant_id=tenant_key).fefo().first() or trained_drug.batches.filter(tenant_id=tenant_key).order_by("-expiry_date").first()
             if fefo_b:
                 batch_id = str(fefo_b.id)
 
@@ -219,11 +222,11 @@ def voice_medicine_search(request):
     if not matched_drug:
         trans_query = transliterate_bangla_to_phonetic(drug_query).strip()
         if trans_query and len(trans_query) >= 2:
-            trans_drug = _find_best_variant_for_form(trans_query, requested_form)
+            trans_drug = _find_best_variant_for_form(trans_query, requested_form, tenant_key)
             if trans_drug:
                 matched_drug = trans_drug
                 matched_brand_name = trans_drug.brand_name
-                fefo_t = trans_drug.batches.fefo().first() or trans_drug.batches.order_by("-expiry_date").first()
+                fefo_t = trans_drug.batches.filter(tenant_id=tenant_key).fefo().first() or trans_drug.batches.filter(tenant_id=tenant_key).order_by("-expiry_date").first()
                 if fefo_t:
                     batch_id = str(fefo_t.id)
 
@@ -244,13 +247,14 @@ def voice_medicine_search(request):
             if target_dict.get("fefo_batch"):
                 batch_id = target_dict["fefo_batch"]["id"]
                 matched_brand_name = target_dict["brand_name"]
-                matched_drug = BrandDrug.objects.filter(id=target_dict["id"]).first()
+                matched_drug = BrandDrug.objects.filter(Q(tenant__isnull=True) | Q(tenant_id=tenant_key), id=target_dict["id"]).first()
 
     # ==============================================================
     # STEP 4: Direct DB Prefix & Contains Query with Batch Prefetch
     # ==============================================================
     if not matched_drug:
         cand_qs = BrandDrug.objects.filter(
+            Q(tenant__isnull=True) | Q(tenant_id=tenant_key),
             Q(brand_name__istartswith=drug_query)
             | Q(brand_name__istartswith=trans_query)
             | Q(brand_name__icontains=drug_query)
@@ -258,10 +262,10 @@ def voice_medicine_search(request):
             is_active=True
         ).prefetch_related('batches')
         if cand_qs.exists():
-            matched_drug = _find_best_variant_for_form(cand_qs.first().brand_name, requested_form)
+            matched_drug = _find_best_variant_for_form(cand_qs.first().brand_name, requested_form, tenant_key)
             if matched_drug:
                 matched_brand_name = matched_drug.brand_name
-                fefo_b = matched_drug.batches.fefo().first() or matched_drug.batches.order_by("-expiry_date").first()
+                fefo_b = matched_drug.batches.filter(tenant_id=tenant_key).fefo().first() or matched_drug.batches.filter(tenant_id=tenant_key).order_by("-expiry_date").first()
                 if fefo_b:
                     batch_id = str(fefo_b.id)
 
@@ -269,15 +273,15 @@ def voice_medicine_search(request):
     # STEP 4.5: Phonetic Soundex & Metaphone Ranking Fallback
     # ==============================================================
     if not matched_drug:
-        all_brands = get_all_active_brands_cached()
+        all_brands = get_all_active_brands_cached(tenant_key)
         ranked = rank_phonetic_matches(drug_query, all_brands, top_n=3)
         # A weak sound-alike should not silently add the wrong medicine.
         if ranked and ranked[0][1] >= 75:
             best_brand_name, score = ranked[0]
-            matched_drug = _find_best_variant_for_form(best_brand_name, requested_form)
+            matched_drug = _find_best_variant_for_form(best_brand_name, requested_form, tenant_key)
             if matched_drug:
                 matched_brand_name = matched_drug.brand_name
-                fefo_b = matched_drug.batches.fefo().first() or matched_drug.batches.order_by("-expiry_date").first()
+                fefo_b = matched_drug.batches.filter(tenant_id=tenant_key).fefo().first() or matched_drug.batches.filter(tenant_id=tenant_key).order_by("-expiry_date").first()
                 if fefo_b:
                     batch_id = str(fefo_b.id)
 
@@ -294,7 +298,7 @@ def voice_medicine_search(request):
                 g_form = (first_item.get("dosage_form") or requested_form or "").strip()
 
                 if g_brand:
-                    best_g = _find_best_variant_for_form(g_brand, g_form)
+                    best_g = _find_best_variant_for_form(g_brand, g_form, tenant_key)
                     if best_g:
                         fefo_g = best_g.batches.fefo().first() or best_g.batches.order_by("-expiry_date").first()
                         if fefo_g:

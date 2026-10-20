@@ -159,3 +159,18 @@ class PaymentTransaction(models.Model):
     def __str__(self) -> str:
         return f"{self.payment_method} ৳{self.amount} for {self.invoice.invoice_number}"
 
+
+
+class MedicineAlias(models.Model):
+    """Voice/OCR nickname learned by one pharmacy; aliases never cross tenants."""
+    tenant = models.ForeignKey("core.Tenant", on_delete=models.CASCADE, related_name="medicine_aliases")
+    alias = models.CharField(max_length=200)
+    brand_name = models.CharField(max_length=200)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=("tenant", "alias"), name="uniq_tenant_medicine_alias")]
+        indexes = [models.Index(fields=("tenant", "brand_name"))]
+
+    def __str__(self):
+        return f"{self.alias} -> {self.brand_name}"

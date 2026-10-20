@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-import json
 import logging
-import os
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
-from django.conf import settings
 from django.core.cache import cache
+from django.db.models import Q
 
-from inventory.models import BrandDrug, GenericDrug
+from inventory.models import BrandDrug
+from pos.models import MedicineAlias
 from pos.utils import (
     COMMON_BN_MEDICINE_ALIASES,
     compute_metaphone,
@@ -20,8 +19,7 @@ from pos.utils import (
 
 logger = logging.getLogger(__name__)
 
-TRAINING_FILE_PATH = os.path.join(settings.BASE_DIR, "media", "medicine_training_aliases.json")
-CACHE_KEY_TRAINED_ALIASES = "pos:trained_medicine_aliases"
+CACHE_KEY_TRAINED_ALIASES = "pos:trained_medicine_aliases:"
 
 
 class DrugTrainingService:
@@ -32,25 +30,18 @@ class DrugTrainingService:
     """
 
     @classmethod
-    def load_trained_aliases(cls) -> Dict[str, str]:
-        """Loads custom user-trained aliases from cache or persistent JSON file."""
-        cached = cache.get(CACHE_KEY_TRAINED_ALIASES)
+    def load_trained_aliases(cls, tenant_id: str) -> Dict[str, str]:
+        """Loads learned aliases from this pharmacy only."""
+        cache_key = f"{CACHE_KEY_TRAINED_ALIASES}{tenant_id}"
+        cached = cache.get(cache_key)
         if cached is not None and isinstance(cached, dict):
             return cached
-
-        aliases = {}
-        if os.path.exists(TRAINING_FILE_PATH):
-            try:
-                with open(TRAINING_FILE_PATH, "r", encoding="utf-8") as f:
-                    aliases = json.load(f)
-            except Exception as e:
-                logger.warning("Could not read training aliases file: %s", e)
-
-        cache.set(CACHE_KEY_TRAINED_ALIASES, aliases, 86400)
+        aliases = dict(MedicineAlias.objects.filter(tenant_id=tenant_id).values_list("alias", "brand_name"))
+        cache.set(cache_key, aliases, 86400)
         return aliases
 
     @classmethod
-    def save_trained_alias(cls, alias_phrase: str, brand_name: str) -> bool:
+    def save_trained_alias(cls, alias_phrase: str, brand_name: str, tenant_id: str) -> bool:
         """
         Saves a newly trained pronunciation or OCR alias mapping.
         Example: 'লাল নাপা' -> 'Napa Extra'
@@ -62,18 +53,20 @@ class DrugTrainingService:
         if not clean_alias or not clean_brand:
             return False
 
-        aliases = cls.load_trained_aliases()
-        aliases[clean_alias] = clean_brand
-        # Also save phonetic transliterated version
+        accessible = Q(tenant__isnull=True) | Q(tenant_id=tenant_id)
+        if not BrandDrug.objects.filter(accessible, brand_name__iexact=clean_brand, is_active=True).exists():
+            return False
+        aliases = [clean_alias]
         trans = transliterate_bangla_to_phonetic(clean_alias).lower()
         if trans != clean_alias:
-            aliases[trans] = clean_brand
+            aliases.append(trans)
 
         try:
-            os.makedirs(os.path.dirname(TRAINING_FILE_PATH), exist_ok=True)
-            with open(TRAINING_FILE_PATH, "w", encoding="utf-8") as f:
-                json.dump(aliases, f, ensure_ascii=False, indent=2)
-            cache.set(CACHE_KEY_TRAINED_ALIASES, aliases, 86400)
+            for alias in aliases:
+                MedicineAlias.objects.update_or_create(
+                    tenant_id=tenant_id, alias=alias, defaults={"brand_name": clean_brand}
+                )
+            cache.delete(f"{CACHE_KEY_TRAINED_ALIASES}{tenant_id}")
             logger.info("Successfully trained alias: '%s' -> '%s'", clean_alias, clean_brand)
             return True
         except Exception as e:
@@ -81,7 +74,7 @@ class DrugTrainingService:
             return False
 
     @classmethod
-    def find_match(cls, query: str) -> Optional[str]:
+    def find_match(cls, query: str, tenant_id: str) -> Optional[str]:
         """
         Looks up a query in:
         1. Exact match in user-trained custom aliases
@@ -95,7 +88,7 @@ class DrugTrainingService:
         clean_q = query.strip().lower()
 
         # 1. Exact match in user-trained dictionary
-        trained = cls.load_trained_aliases()
+        trained = cls.load_trained_aliases(tenant_id)
         if clean_q in trained:
             return trained[clean_q]
 

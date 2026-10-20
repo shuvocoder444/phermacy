@@ -88,7 +88,14 @@
                     <span>কার্টে যোগ</span>
                 </button>
                 {% else %}
-                <span class="text-xs text-rose-700 font-bold px-3 py-1.5 rounded-xl bg-rose-50 border border-rose-200 shrink-0">স্টক নেই</span>
+                <button
+                    type="button"
+                    @click="openAddDrugModal('{{ drug.brand_name|escapejs }}', '{{ drug.generic_name|default:''|escapejs }}', '{{ drug.strength|default:''|escapejs }}', '{{ drug.manufacturer|default:''|escapejs }}', '{{ drug.dosage_form|default:'Tablet'|escapejs }}'); cameraModalOpen = false; stopCamera();"
+                    class="text-xs text-amber-700 hover:text-amber-800 font-bold px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-300 shrink-0 transition-all flex items-center gap-1 active:scale-95"
+                    title="এই ওষুধের নতুন ব্যাচ ও স্টক ইনভেন্টরিতে যোগ করুন">
+                    <span>➕</span>
+                    <span>স্টক যোগ করুন</span>
+                </button>
                 {% endif %}
             </div>
 
@@ -148,12 +155,53 @@
     <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-left text-xs text-amber-900 flex items-start gap-2">
         <span class="text-base">⚠️</span>
         <div>
-            <div class="font-bold">Google Gemini API কোটা (Daily Free Quota) শেষ হয়েছে!</div>
-            <div class="text-[11px] text-amber-800 mt-0.5">গুগল ফ্রি টিয়ারের ২০টি রিকোয়েস্টের দৈনিক লিমিট শেষ। অনুগ্রহ করে Google AI Studio থেকে আপনার দ্বিতীয় API Key (...HV5w) কপি করে উপরে <strong>[🤖 AI]</strong> সেটিংসে পেস্ট করে সংরক্ষণ করুন।</div>
+            <div class="font-bold">Google Gemini API কোটা শেষ হয়েছে (লোকাল OCR সক্রিয়)</div>
+            <div class="text-[11px] text-amber-800 mt-0.5">গুগল ফ্রি লিমিট শেষ হওয়ায় লোকাল ইঞ্জিন দিয়ে স্ক্যান করা হচ্ছে। ব্যাকআপ কী থাকলে উপরে <strong>[🤖 AI]</strong> সেটিংসে কমা দিয়ে যুক্ত করতে পারেন।</div>
         </div>
     </div>
     {% endif %}
-    {% if primary_brand_name %}
+
+    {% if suggested_brand_name or primary_brand_name %}
+    <div class="p-4 bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 border-2 border-amber-400 rounded-2xl shadow-sm text-left space-y-3">
+        <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-amber-950 flex items-center gap-1.5">
+                <span class="text-base">💊</span> ক্যামেরা থেকে শনাক্তকৃত ওষুধের নাম:
+            </span>
+            <span class="px-2.5 py-0.5 rounded-full bg-amber-200 text-amber-900 text-[10px] font-bold">নতুন ওষুধ</span>
+        </div>
+        <div class="flex items-start justify-between gap-3">
+            <div>
+                <div class="text-lg sm:text-xl font-black text-slate-900 font-mono flex flex-wrap items-center gap-2">
+                    <span>{{ suggested_brand_name|default:primary_brand_name }}</span>
+                    {% if suggested_dosage_form %}
+                    <span class="text-xs px-2 py-0.5 bg-white border border-amber-200 rounded-md font-bold text-amber-800">{{ suggested_dosage_form }}</span>
+                    {% endif %}
+                    {% if suggested_strength %}
+                    <span class="text-xs px-2 py-0.5 bg-white border border-amber-200 rounded-md font-bold text-amber-800 font-mono">{{ suggested_strength }}</span>
+                    {% endif %}
+                </div>
+                <div class="text-xs text-slate-600 mt-1">
+                    এই ওষুধটি বর্তমানে ইনভেন্টরিতে নেই। নিচে ক্লিক করে ১-ক্লিকেই যুক্ত করে কার্টে নিতে পারেন।
+                </div>
+            </div>
+        </div>
+        <div class="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 border-t border-amber-200">
+            <button 
+                type="button" 
+                @click="openAddDrugModal('{{ suggested_brand_name|default:primary_brand_name|escapejs }}', '', '{{ suggested_strength|default:''|escapejs }}', '', '{{ suggested_dosage_form|default:'Tablet'|escapejs }}'); cameraModalOpen = false; stopCamera();"
+                class="px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-extrabold rounded-xl text-xs sm:text-sm shadow-md shadow-emerald-600/30 flex items-center justify-center gap-1.5 transition-all active:scale-95">
+                <span>➕</span>
+                <span>এই ওষুধটি ইনভেন্টরি ও কার্টে যুক্ত করুন</span>
+            </button>
+            <button 
+                type="button" 
+                @click="sendDetectedToSearch('{{ suggested_brand_name|default:primary_brand_name|escapejs }}')"
+                class="px-3.5 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-1 active:scale-95">
+                <span>🔍 মূল সার্চ বারে খুঁজুন</span>
+            </button>
+        </div>
+    </div>
+    {% elif primary_brand_name %}
     <div class="p-3.5 sm:p-4 bg-gradient-to-r from-emerald-50 via-teal-50 to-cyan-50 border-2 border-emerald-500 rounded-2xl shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 text-left">
         <div class="flex items-center space-x-3 min-w-0">
             <div class="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-emerald-500/15 border border-emerald-500/20 text-emerald-700 flex items-center justify-center text-xl shrink-0">

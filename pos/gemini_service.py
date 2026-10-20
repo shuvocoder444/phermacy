@@ -79,42 +79,45 @@ class GeminiAIService:
     @classmethod
     def _execute_gemini_request(cls, api_key: str, payload: Dict[str, Any], timeout: int = 15) -> Tuple[bool, Any]:
         """
-        Executes a Gemini REST request across available models with automatic fallback
-        if a specific model is busy (503) or not found (404).
+        Executes a Gemini REST request across available models with automatic multi-key rotation
+        if a key hits a quota (429) and model fallback if a specific model is busy (503) or not found (404).
         """
-        clean_key = api_key.strip()
-        if not clean_key:
+        keys = [k.strip() for k in re.split(r'[,;\n]+', api_key) if k.strip() and "..." not in k]
+        if not keys:
             return False, "কোনো API Key প্রদান করা হয়নি।"
 
-        headers = {
-            "Content-Type": "application/json",
-            "x-goog-api-key": clean_key,
-        }
-
         last_error = ""
-        for model in GEMINI_MODELS:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={clean_key}"
-            try:
-                resp = requests.post(url, headers=headers, json=payload, timeout=timeout)
-                if resp.status_code == 200:
-                    return True, resp.json()
+        for clean_key in keys:
+            headers = {
+                "Content-Type": "application/json",
+                "x-goog-api-key": clean_key,
+            }
+            for model in GEMINI_MODELS:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={clean_key}"
+                try:
+                    resp = requests.post(url, headers=headers, json=payload, timeout=timeout)
+                    if resp.status_code == 200:
+                        return True, resp.json()
 
-                # If model is deprecated (404) or experiencing temporary demand spike (503), try next model
-                if resp.status_code in (404, 503):
-                    logger.warning("Gemini model %s returned %s, trying next candidate...", model, resp.status_code)
+                    if resp.status_code in (404, 503):
+                        logger.warning("Gemini model %s returned %s, trying next candidate...", model, resp.status_code)
+                        continue
+
+                    error_data = resp.json().get("error", {})
+                    last_error = error_data.get("message", resp.text)
+                    logger.warning("Gemini model %s with key ...%s error %s: %s", model, clean_key[-6:], resp.status_code, last_error)
+
+                    if resp.status_code == 429:
+                        logger.warning("Key ...%s exceeded quota (429). Trying next key...", clean_key[-6:])
+                        break
+                except requests.exceptions.Timeout:
+                    logger.warning("Gemini model %s timed out, trying next candidate...", model)
                     continue
+                except Exception as req_err:
+                    last_error = str(req_err)
+                    logger.warning("Gemini model %s request exception: %s", model, req_err)
 
-                error_data = resp.json().get("error", {})
-                last_error = error_data.get("message", resp.text)
-                logger.warning("Gemini model %s error %s: %s", model, resp.status_code, last_error)
-            except requests.exceptions.Timeout:
-                logger.warning("Gemini model %s timed out, trying next candidate...", model)
-                continue
-            except Exception as req_err:
-                last_error = str(req_err)
-                logger.warning("Gemini model %s request exception: %s", model, req_err)
-
-        return False, last_error or "সবগুলো Gemini মডেল আনএভেইলেবল বা নেটওয়ার্ক টাইমআউট হয়েছে।"
+        return False, last_error or "সবগুলো Gemini মডেল আনএভেইলেবল বা কোটা শেষ হয়েছে।"
 
     @classmethod
     def get_config(cls) -> Dict[str, Any]:
@@ -425,7 +428,14 @@ class GeminiAIService:
                     if token in d_gen:
                         score += 5.0
 
-            fefo = drug.batches.fefo().first() or drug.batches.order_by("-expiry_date").first()
+            from django.db.models import Sum
+            from django.utils import timezone
+            if tenant_key and tenant_key != "default_tenant":
+                tenant_batches = drug.batches.filter(tenant_id=tenant_key)
+            else:
+                tenant_batches = drug.batches.all()
+            fefo = tenant_batches.fefo().first() or tenant_batches.order_by("-expiry_date").first()
+            calculated_stock = tenant_batches.filter(current_stock__gt=0, expiry_date__gt=timezone.now().date()).aggregate(total=Sum("current_stock"))["total"] or 0
             drug_dict = {
                 "id": str(drug.id),
                 "brand_name": drug.brand_name,
@@ -436,7 +446,7 @@ class GeminiAIService:
                 "dosage_form": drug.dosage_form.short_name or drug.dosage_form.name if drug.dosage_form else "Tab",
                 "generic_name": drug.generic.name if drug.generic else "N/A",
                 "manufacturer": drug.manufacturer.name if drug.manufacturer else "N/A",
-                "total_stock": drug.total_stock,
+                "total_stock": calculated_stock,
                 "score": min(100, round(score)),
                 "ai_engine": "gemini",
                 "fefo_batch": {

@@ -675,6 +675,14 @@ def add_custom_drug_and_batch_htmx(request):
     cart_manager = get_cart_manager(request)
     cart = cart_manager.add_item(batch_id=str(batch.id), quantity=1)
 
+    # Invalidate OCR catalog cache so newly added drug is immediately recognized by scanner
+    try:
+        from django.core.cache import cache
+        tenant_key = str(tenant.id) if tenant else 'default_tenant'
+        cache.delete(f'pos:all_active_drugs_ocr_cache:{tenant_key}')
+    except Exception:
+        pass
+
     context = {
         "cart": cart,
         "is_htmx": True,

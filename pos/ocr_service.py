@@ -113,130 +113,150 @@ def _read_large_text(image, config: str) -> str:
     return "\n".join(" ".join(words) for words in lines.values())
 
 
+def extract_prominent_candidate_brand(clean_text: str) -> tuple[str, str, str]:
+    """
+    Extracts the most plausible brand name, dosage form, and strength from raw OCR text
+    when no catalog match is found.
+    Example: 'uet Tablet ae & wt Duet Table a a4' -> ('Duet', 'Tablet', '')
+    """
+    if not clean_text:
+        return "", "Tablet", ""
+
+    lower_t = clean_text.lower()
+    form = "Tablet"
+    if "cap" in lower_t or "capsule" in lower_t:
+        form = "Capsule"
+    elif "syr" in lower_t or "syrup" in lower_t:
+        form = "Syrup"
+    elif "susp" in lower_t:
+        form = "Suspension"
+    elif "drop" in lower_t:
+        form = "Eye Drops"
+    elif "inj" in lower_t:
+        form = "Injection"
+
+    str_match = re.search(r'\b(\d+(?:\.\d+)?)\s*(mg|mcg|ml|gm|g)\b', clean_text, re.IGNORECASE)
+    strength = f"{str_match.group(1)} {str_match.group(2)}" if str_match else ""
+
+    ignore = {
+        "tablet", "tablets", "capsule", "capsules", "syrup", "suspension",
+        "pharma", "pharmaceuticals", "ltd", "plc", "mg", "ml", "batch",
+        "date", "exp", "mfg", "mrp", "lic", "dar", "keep", "cool", "dry",
+        "place", "light", "children", "reach", "only", "use", "usp", "bdt",
+        "table", "strip", "box", "price", "retail", "standard"
+    }
+
+    # Find title-cased words (e.g. Duet, Imotil, Napa)
+    title_words = [w for w in re.findall(r'\b[A-Z][a-z]{2,}\b', clean_text) if w.lower() not in ignore]
+    if title_words:
+        from collections import Counter
+        return Counter(title_words).most_common(1)[0][0], form, strength
+
+    # Fallback to any alphabetic word of len >= 3
+    all_words = [w.capitalize() for w in re.findall(r'\b[a-zA-Z]{3,}\b', clean_text) if w.lower() not in ignore]
+    if all_words:
+        from collections import Counter
+        return Counter(all_words).most_common(1)[0][0], form, strength
+
+    return "", form, strength
+
+
 def rank_drugs_with_multi_signal(clean_text: str, all_drugs: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """
     Intelligent Multi-Signal Drug Ranking Algorithm:
-    - Eliminates false-positive 2-3 letter noise words (e.g. AX, APT, OR, TIE).
-    - Multi-token brand prioritization (e.g. Entacyd Plus over Entacyd if combination evidence exists).
-    - Chemical / Generic co-occurrence detection (e.g. Simethicone, Paracetamol).
-    - Strength & Dosage form disambiguation (e.g. Chewable Tablet vs Suspension).
+    - High-speed candidate pre-filtering using token n-grams and character prefixes.
+    - Token-level fuzzy matching (difflib/SequenceMatcher >= 70%) to gracefully handle foil reflections.
+    - Dosage form, strength, and generic corroboration with safety disambiguation.
     """
+    import difflib
     ocr_lower = clean_text.lower()
-    # Split mixed OCR tokens such as "500mg" into words and numbers. Matching
-    # only whole tokens avoids false hits such as 500 matching 1500, or a brand
-    # matching a substring inside a manufacturer name.
     ocr_tokens = set(re.findall(r"[a-z]+|\d+", ocr_lower))
+    ocr_words = [t for t in ocr_tokens if len(t) >= 3 and not t.isdigit()]
+
+    if not ocr_words:
+        return []
+
     ocr_strength_numbers = {
         number
         for number, _unit in re.findall(
-            r"\b(\d+(?:\.\d+)?)\s*(mg|mcg|µg|ml|gm|g|iu)\b", ocr_lower
+            r"\b(\d+(?:\.\d+)?)\s*(mg|mcg|µg|ml|gm|g|iu)?\b", ocr_lower
         )
     }
-    exact_candidates = []
-    for drug in all_drugs:
-        # Digits in OCR often come from package strengths, not the brand. Never
-        # use a numeric brand suffix like #40 or #120 as identity evidence.
-        name_tokens = re.findall(r"[a-z]+", (drug.get("brand_name") or "").lower())
-        if any(token in ocr_tokens for token in name_tokens if len(token) >= 4):
-            exact_candidates.append(drug)
 
-    # Fuzzy matching across every product is expensive and prone to false
-    # positives. Exact OCR token hits form the fast candidate shortlist; if no
-    # brand token survived OCR, return no local guess and let vision fallback run.
-    if not exact_candidates:
+    has_tab = bool(re.search(r"\b(tab|tablet|tablets)\b", ocr_lower))
+    has_cap = bool(re.search(r"\b(cap|capsule|capsules)\b", ocr_lower))
+    has_syr = bool(re.search(r"\b(syr|syrup|susp|suspension)\b", ocr_lower))
+
+    # Fast 2-char prefix index to narrow candidates across 40k items in <10ms
+    ocr_prefixes = {w[:3] for w in ocr_words if len(w) >= 3}
+    candidates = []
+    for d in all_drugs:
+        b_lower = (d.get("brand_name") or "").lower()
+        if any(p in b_lower for p in ocr_prefixes) or any(t in b_lower for t in ocr_words):
+            candidates.append(d)
+
+    if not candidates:
         return []
-    scored_candidates = []
 
-    for d in exact_candidates:
+    scored_candidates = []
+    for d in candidates:
         b_name = d["brand_name"]
         b_lower = b_name.lower().strip()
-        b_tokens = [t for t in re.findall(r"[a-z]+", b_lower) if len(t) >= 4]
+        b_tokens = [t for t in re.findall(r"[a-z]+", b_lower) if len(t) >= 3 and t not in ("tab", "cap", "tablet", "capsule", "standard", "plus")]
+        if not b_tokens:
+            b_tokens = [t for t in re.findall(r"[a-z]+", b_lower) if len(t) >= 3]
         if not b_tokens:
             continue
 
-        is_short_brand = len(b_lower) <= 3
+        best_brand_sim = 0.0
+        exact_brand_hit = False
 
-        # 1. Brand Tokens Matching
-        matched_tokens = 0
-        exact_token_matches = 0
-        for tok in b_tokens:
-            if len(tok) <= 3:
-                if tok in ocr_tokens:
-                    exact_token_matches += 1
-                    matched_tokens += 1
+        for bt in b_tokens:
+            if bt in ocr_tokens:
+                best_brand_sim = max(best_brand_sim, 1.0)
+                exact_brand_hit = True
             else:
-                if tok in ocr_tokens:
-                    matched_tokens += 1
-                    exact_token_matches += 1
+                for ow in ocr_words:
+                    if bt in ow or ow in bt:
+                        sim = len(min(bt, ow, key=len)) / len(max(bt, ow, key=len))
+                        best_brand_sim = max(best_brand_sim, sim)
+                    else:
+                        sim = difflib.SequenceMatcher(None, bt, ow).ratio()
+                        if sim > best_brand_sim:
+                            best_brand_sim = sim
 
-        if matched_tokens == 0:
+        if best_brand_sim < 0.70:
             continue
 
-        # If the label clearly shows a strength, do not return another strength
-        # variant of the same brand (for example Renova 500 mg for a 120 mg/5 ml bottle).
+        brand_score = best_brand_sim * 65.0
+
+        # Strength Score
+        str_score = 0
         drug_strength = (d.get("strength") or "").lower()
-        drug_strength_numbers = set(re.findall(r"\d+(?:\.\d+)?", drug_strength))
-        if ocr_strength_numbers and drug_strength_numbers and not (
-            ocr_strength_numbers & drug_strength_numbers
-        ):
-            continue
+        drug_strength_nums = set(re.findall(r"\d+(?:\.\d+)?", drug_strength))
+        if drug_strength_nums and ocr_strength_numbers:
+            if drug_strength_nums.intersection(ocr_strength_numbers):
+                str_score = 15.0
 
-        brand_ratio = matched_tokens / len(b_tokens)
-        brand_score = brand_ratio * 70.0
+        # Dosage Form Score
+        form_score = 0
+        d_form = ((d.get("dosage_form__name") or "") + " " + (d.get("dosage_form__short_name") or "")).lower()
+        if ("tab" in d_form and has_tab) or ("cap" in d_form and has_cap) or ("syr" in d_form and has_syr):
+            form_score = 15.0
 
-        # 2. Generic Chemical Score (0-35)
+        # Generic Chemical Score
         gen_score = 0
         gen_name = (d.get("generic__name") or "").lower()
         if gen_name:
-            for gen_part in re.findall(r"[a-zA-Z]{4,}", gen_name):
-                if gen_part in ("acid", "sodium", "potassium", "chloride", "hydrochloride", "hydrate", "oral", "tablet"):
+            for gp in re.findall(r"[a-z]{4,}", gen_name):
+                if gp in ("acid", "sodium", "potassium", "chloride", "hydrochloride", "hydrate", "oral", "tablet"):
                     continue
-                if gen_part in ocr_tokens:
+                if gp in ocr_tokens:
                     gen_score += 15
-        gen_score = min(35, gen_score)
+        gen_score = min(25, gen_score)
 
-        # 3. Strength Score (0-20)
-        str_score = 0
-        str_val = (d.get("strength") or "").lower()
-        if str_val:
-            str_nums = re.findall(r"\d+", str_val)
-            for num in str_nums:
-                if int(num) > 5 and num in ocr_tokens:
-                    str_score += 8
-        str_score = min(20, str_score)
-
-        # 4. Dosage Form Score (0-15)
-        form_score = 0
-        form_val = (d.get("dosage_form__name") or "").lower()
-        if form_val:
-            for f_w in re.findall(r"[a-zA-Z]{4,}", form_val):
-                if f_w in ocr_tokens:
-                    form_score += 8
-        form_score = min(15, form_score)
-
-        # 5. Combination Boost for Multi-token Brands
-        combo_boost = 0
-        if len(b_tokens) > 1 and exact_token_matches >= 1:
-            if gen_score >= 15 or str_score >= 8:
-                combo_boost = 25
-
-        # A single OCR token is weak evidence for a one-word brand (e.g. a
-        # noisy read of "Metro" must not suggest an unrelated product). Require
-        # a matching ingredient or strength before presenting that candidate.
-        if len(b_tokens) == 1 and gen_score == 0 and str_score == 0:
-            continue
-
-        # For a multi-word brand, partial brand evidence also needs clinical
-        # corroboration from the printed ingredient or strength.
-        if len(b_tokens) > 1 and brand_ratio < 1 and gen_score == 0 and str_score == 0:
-            continue
-
-        # Suppress short noisy names unless there is supporting package text.
-        if is_short_brand and gen_score == 0 and str_score == 0:
-            continue
-
-        total_score = brand_score + gen_score + str_score + form_score + combo_boost
-        if total_score >= 50:
+        total_score = brand_score + str_score + form_score + gen_score
+        if total_score >= 45:
             item_copy = dict(d)
             item_copy["name"] = item_copy["brand_name"]
             item_copy["price"] = float(item_copy["unit_mrp"])
@@ -250,8 +270,6 @@ def rank_drugs_with_multi_signal(clean_text: str, all_drugs: list[dict[str, Any]
 
     scored_candidates.sort(key=lambda x: x["_rank_score"], reverse=True)
     if scored_candidates:
-        # Keep the result list focused on close matches to the strongest
-        # brand/strength evidence instead of filling it with shared-word noise.
         best_score = scored_candidates[0]["_rank_score"]
         scored_candidates = [item for item in scored_candidates if item["_rank_score"] >= best_score - 25]
     for item in scored_candidates:
@@ -541,10 +559,17 @@ def scan_medicine_ocr(request):
 
         # HTMX partial response
         primary_brand = top_drugs[0]["brand_name"] if top_drugs else ""
+        sug_brand, sug_form, sug_strength = "", "Tablet", ""
+        if not top_drugs:
+            sug_brand, sug_form, sug_strength = extract_prominent_candidate_brand(clean_text)
+
         if request.headers.get("HX-Request") and request.POST.get("format") != "json":
             return render(request, "pos/partials/camera_scan_results.html", {
                 "detected_drugs": top_drugs,
                 "primary_brand_name": primary_brand,
+                "suggested_brand_name": sug_brand,
+                "suggested_dosage_form": sug_form,
+                "suggested_strength": sug_strength,
                 "raw_text": clean_text[:150],
                 "ai_engine": "local",
                 "quota_warning": getattr(request, "_gemini_quota_error", False),

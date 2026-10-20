@@ -38,9 +38,11 @@ class POSCheckoutService:
         if not cart["items"]:
             raise ValueError("Cannot checkout with an empty cart.")
 
-        # Resolve tenant if not explicitly provided
+        # POS checkout must always be attached to one tenant.
         if not tenant and hasattr(cashier, "staff_profile") and cashier.staff_profile:
             tenant = cashier.staff_profile.tenant
+        if not tenant:
+            raise ValueError("Select an active pharmacy before completing checkout.")
 
         # Generate unique invoice sequence (INV-YYYYMMDD-XXXX)
         today_str = timezone.now().strftime("%Y%m%d")
@@ -53,6 +55,10 @@ class POSCheckoutService:
         vat_percent = Decimal(cart["vat_percent"])
         vat_amount = Decimal(cart["vat_amount"])
         total_payable = Decimal(cart["total_payable"])
+
+        # Cash sales must be fully paid at the counter; never create an accidental due.
+        if payment_method == "CASH" and paid_amount < total_payable:
+            raise ValueError("Cash received is less than the amount payable.")
 
         # Customer Resolution
         customer = None
@@ -109,9 +115,21 @@ class POSCheckoutService:
             doctor_name=doctor_name,
         )
 
-        # Process Each Line Item and Deduct Stock from Batch with Lock
+        # Lock all sold batches in one query. The former per-line select_for_update
+        # added one database round-trip for every medicine in the bill.
+        batch_ids = [item["batch_id"] for item in cart["items"]]
+        locked_batches = {
+            str(batch.id): batch
+            for batch in DrugBatch.objects.select_for_update()
+            .filter(id__in=batch_ids, tenant=tenant)
+            .select_related("drug")
+        }
+
+        # Process each line and deduct stock from its locked batch.
         for item in cart["items"]:
-            batch = DrugBatch.objects.select_for_update().get(id=item["batch_id"])
+            batch = locked_batches.get(str(item["batch_id"]))
+            if not batch:
+                raise ValueError("A medicine batch in the cart is no longer available.")
             qty = int(item["quantity"])
 
             if batch.current_stock < qty:
