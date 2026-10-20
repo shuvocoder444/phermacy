@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import base64
 import os
 import sys
 
@@ -20,7 +19,7 @@ if hasattr(sys.stdout, "reconfigure"):
 
 import logging
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 try:
     import cv2
@@ -80,7 +79,7 @@ def _safe_partial_ratio(s1: str, s2: str) -> int:
     return int(difflib.SequenceMatcher(None, s1.lower(), s2.lower()).ratio() * 100)
 
 
-def rank_drugs_with_multi_signal(clean_text: str, all_drugs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def rank_drugs_with_multi_signal(clean_text: str, all_drugs: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """
     Intelligent Multi-Signal Drug Ranking Algorithm:
     - Eliminates false-positive 2-3 letter noise words (e.g. AX, APT, OR, TIE).
@@ -217,7 +216,17 @@ def scan_medicine_ocr(request):
         if img is None or raw_bytes is None:
             return JsonResponse({"status": "failed", "message": "ভুল ইমেজ ফরম্যাট"})
 
-        # ==============================================================
+        # Keep camera payloads compact while retaining readable medicine-label detail.
+        height, width = img.shape[:2]
+        longest_edge = max(height, width)
+        if longest_edge > 1600:
+            scale = 1600 / longest_edge
+            img = cv2.resize(img, (round(width * scale), round(height * scale)), interpolation=cv2.INTER_AREA)
+        encoded, buffer = cv2.imencode('.jpg', img, [int(cv2.IMWRITE_JPEG_QUALITY), 88])
+        if encoded:
+            raw_bytes = buffer.tobytes()
+
+        # ============================================================== 
         # PRIORITY 1: Google Gemini Flash Vision Multimodal Engine
         # ==============================================================
         if GeminiAIService.is_gemini_active():
@@ -421,7 +430,7 @@ def scan_medicine_ocr(request):
         logger.exception("OCR error: %s", e)
         return JsonResponse({
             "status": "failed",
-            "message": f"প্রসেসিং এরর: {str(e)}"
+            "message": f"প্রসেসিং এরর: {e!s}"
         })
 
 

@@ -11,8 +11,8 @@
 সুপার এডমিন (SaaS কন্ট্রোল): ইউজারনেম: admin | পাসওয়ার্ড: Admin1234@#
 ফার্মেসি ওনার (উত্তরা ব্রাঞ্চ): ইউজারনেম: uttara_owner | পাসওয়ার্ড: Owner1234@#
 
-
-
+python restart_live.py
+amar লোকাল কোডের  লাইভ প্রোডাকশন সার্ভারে সফলভাবে আপলোড koro এবং সার্ভার রিস্টার্ট সম্পন্ন koro
 
 A high-performance, multi-tenant Pharmacy Management SaaS built specifically for retail pharmacies in Bangladesh using **Python**, **Django 5+**, **HTMX**, **Tailwind CSS**, **Alpine.js**, **Redis**, and **PostgreSQL**.
 

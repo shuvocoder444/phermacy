@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import threading
 from decimal import Decimal
 from typing import Any
 
 from django.core.cache import cache
 
 from inventory.models import DrugBatch
+
+_LOCAL_CART_LOCKS: dict[str, threading.RLock] = {}
+_LOCAL_CART_LOCKS_GUARD = threading.Lock()
 
 
 class POSCartManager:
@@ -39,37 +43,66 @@ class POSCartManager:
     def _save_raw_cart(self, data: dict[str, Any]) -> None:
         cache.set(self.cache_key, data, timeout=self.CART_TTL)
 
+    def _write_lock(self):
+        """Use the cache backend's distributed lock, or a local thread lock."""
+        cache_lock = getattr(cache, "lock", None)
+        if callable(cache_lock):
+            return cache_lock(f"{self.cache_key}:write-lock", timeout=10, blocking_timeout=5)
+
+        # LocMemCache (the development backend) does not implement cache.lock.
+        # Keep local multi-threaded requests safe without requiring Redis.
+        with _LOCAL_CART_LOCKS_GUARD:
+            return _LOCAL_CART_LOCKS.setdefault(self.cache_key, threading.RLock())
+
     def add_item(self, batch_id: str, quantity: int = 1) -> dict[str, Any]:
         """
         Adds a medicine batch to the cart. If already present, increments the quantity.
         """
-        cart = self._get_raw_cart()
-        batch = DrugBatch.objects.select_related("drug", "drug__dosage_form").get(id=batch_id)
-        
-        batch_key = str(batch.id)
-        if batch_key in cart["items"]:
-            new_qty = cart["items"][batch_key]["quantity"] + quantity
-            if new_qty <= batch.current_stock:
-                cart["items"][batch_key]["quantity"] = new_qty
-            else:
-                cart["items"][batch_key]["quantity"] = batch.current_stock
-        else:
-            final_qty = min(quantity, batch.current_stock)
-            cart["items"][batch_key] = {
-                "batch_id": str(batch.id),
-                "drug_id": str(batch.drug.id),
-                "brand_name": batch.drug.brand_name,
-                "strength": batch.drug.strength,
-                "dosage_form": batch.drug.dosage_form.short_name or batch.drug.dosage_form.name,
-                "batch_number": batch.batch_number,
-                "expiry_date": batch.expiry_date.strftime("%Y-%m-%d"),
-                "unit_mrp": str(batch.unit_mrp),
-                "unit_tp": str(batch.purchase_price),
-                "max_stock": batch.current_stock,
-                "quantity": final_qty,
-            }
+        return self.add_items([(batch_id, quantity)])
 
-        self._save_raw_cart(cart)
+    def add_items(self, batch_quantities: list[tuple[str, int]]) -> dict[str, Any]:
+        """Add one or more batches in one locked read/modify/write cycle."""
+        if not batch_quantities:
+            return self.get_cart_summary()
+
+        # Resolve all batches in one query before taking the short Redis lock.
+        requested = {}
+        for batch_id, quantity in batch_quantities:
+            requested[str(batch_id)] = requested.get(str(batch_id), 0) + max(0, int(quantity))
+        batches = DrugBatch.objects.filter(id__in=requested).select_related(
+            "drug", "drug__dosage_form"
+        )
+        batch_map = {str(batch.id): batch for batch in batches}
+
+        # Concurrent clicks used to race: each request read the same cart and the
+        # last Redis write silently discarded the other additions.
+        with self._write_lock():
+            cart = self._get_raw_cart()
+            for batch_key, quantity in requested.items():
+                batch = batch_map.get(batch_key)
+                if not batch or quantity <= 0:
+                    continue
+                current = cart["items"].get(batch_key)
+                new_qty = min((current["quantity"] if current else 0) + quantity, batch.current_stock)
+                if current:
+                    current["quantity"] = new_qty
+                    current["max_stock"] = batch.current_stock
+                elif new_qty > 0:
+                    dosage = batch.drug.dosage_form
+                    cart["items"][batch_key] = {
+                        "batch_id": str(batch.id),
+                        "drug_id": str(batch.drug.id),
+                        "brand_name": batch.drug.brand_name,
+                        "strength": batch.drug.strength,
+                        "dosage_form": (dosage.short_name or dosage.name) if dosage else "Tab",
+                        "batch_number": batch.batch_number,
+                        "expiry_date": batch.expiry_date.strftime("%Y-%m-%d") if batch.expiry_date else "",
+                        "unit_mrp": str(batch.unit_mrp),
+                        "unit_tp": str(batch.purchase_price),
+                        "max_stock": batch.current_stock,
+                        "quantity": new_qty,
+                    }
+            self._save_raw_cart(cart)
         return self.get_cart_summary()
 
     def update_quantity(self, batch_id: str, quantity: int) -> dict[str, Any]:

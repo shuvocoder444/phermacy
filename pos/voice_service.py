@@ -271,7 +271,8 @@ def voice_medicine_search(request):
     if not matched_drug:
         all_brands = get_all_active_brands_cached()
         ranked = rank_phonetic_matches(drug_query, all_brands, top_n=3)
-        if ranked:
+        # A weak sound-alike should not silently add the wrong medicine.
+        if ranked and ranked[0][1] >= 75:
             best_brand_name, score = ranked[0]
             matched_drug = _find_best_variant_for_form(best_brand_name, requested_form)
             if matched_drug:

@@ -185,7 +185,8 @@ class GeminiAIService:
             '  "manufacturer": "Pharma company (e.g. Square, Incepta, Beximco, Renata)",\n'
             '  "confidence": 0.98\n'
             "}\n"
-            "If any field cannot be fully confirmed, provide your best clinical deduction based on visible cues."
+            "Do not guess or infer a brand from color, packaging style, or generic ingredients. "
+            "If the printed brand name is not clearly readable, return an empty brand_name and low confidence."
         )
 
         payload = {
@@ -211,7 +212,9 @@ class GeminiAIService:
             }
         }
 
-        success, data = cls._execute_gemini_request(api_key, payload, timeout=8)
+        # Vision is an optional assist; keep its worst-case delay bounded so a
+        # slow provider does not stall the cashier for two full model timeouts.
+        success, data = cls._execute_gemini_request(api_key, payload, timeout=4)
         if not success or not isinstance(data, dict):
             logger.error("Gemini Vision analysis failed: %s", data)
             return None
@@ -225,6 +228,12 @@ class GeminiAIService:
             cleaned_json_text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text_content, flags=re.MULTILINE).strip()
             parsed = json.loads(cleaned_json_text)
             logger.info("Gemini Vision Success: %s", parsed)
+            try:
+                confidence = float(parsed.get("confidence", 0) or 0)
+            except (TypeError, ValueError):
+                confidence = 0
+            if confidence < 0.65:
+                return None
             return parsed
         except Exception as e:
             logger.error("Gemini Vision JSON parsing exception: %s", e)

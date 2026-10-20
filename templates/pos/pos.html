@@ -1259,11 +1259,11 @@ function posTerminal() {
 
         sendVoiceToBackend(text) {
             if (!text || !text.trim()) return;
-            htmx.ajax('POST', "{% url 'pos:voice_parse' %}", {
+            enqueueCartRequest(() => htmx.ajax('POST', "{% url 'pos:voice_parse' %}", {
                 target: '#cart-container',
                 swap: 'outerHTML',
                 values: { 'transcript': text.trim() }
-            });
+            }));
         },
 
         async openCameraModal() {
@@ -1703,13 +1703,36 @@ function playCartAddSound() {
 }
 window.playCartAddSound = playCartAddSound;
 
-function addDrugBatch(batchId) {
-    playCartAddSound();
-    htmx.ajax('POST', "{% url 'pos:cart_add' %}", {
+// Coalesce rapid product clicks into one cart update, then serialize the
+// response swaps so an older request cannot replace a newer cart view.
+let pendingCartBatchIds = [];
+let cartBatchTimer = null;
+let cartRequestQueue = Promise.resolve();
+
+function enqueueCartRequest(request) {
+    cartRequestQueue = cartRequestQueue
+        .catch(() => {})
+        .then(request)
+        .catch(error => console.error('POS cart update failed:', error));
+    return cartRequestQueue;
+}
+
+function flushCartBatchAdds() {
+    cartBatchTimer = null;
+    if (!pendingCartBatchIds.length) return;
+    const batchIds = pendingCartBatchIds.splice(0);
+    enqueueCartRequest(() => htmx.ajax('POST', "{% url 'pos:cart_add' %}", {
         target: '#cart-container',
         swap: 'outerHTML',
-        values: { 'batch_id': batchId, 'quantity': 1 }
-    });
+        values: { 'batch_ids': JSON.stringify(batchIds), 'quantity': 1 }
+    }));
+}
+
+function addDrugBatch(batchId) {
+    playCartAddSound();
+    pendingCartBatchIds.push(batchId);
+    if (cartBatchTimer) clearTimeout(cartBatchTimer);
+    cartBatchTimer = setTimeout(flushCartBatchAdds, 60);
 }
 
 function addScannedDrugToCart(batchId) {
