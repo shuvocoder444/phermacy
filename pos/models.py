@@ -97,6 +97,7 @@ class Invoice(models.Model):
         indexes = [
             models.Index(fields=["invoice_number", "created_at"]),
             models.Index(fields=["customer", "status"]),
+            models.Index(fields=["tenant", "created_at", "status"]),
         ]
         verbose_name = _("Sale Invoice")
         verbose_name_plural = _("Sale Invoices")

@@ -3,7 +3,7 @@ import logging
 from decimal import Decimal
 from typing import List, Dict, Any, Optional
 from django.core.cache import cache
-from django.db.models import Q, Sum, F, Case, When, Value, IntegerField
+from django.db.models import Q, Sum, F, Case, When, Value, IntegerField, Prefetch
 from django.utils import timezone
 from .models import BrandDrug, DrugBatch, GenericDrug
 
@@ -30,24 +30,33 @@ class DrugSearchAndCacheService:
     @classmethod
     def search_drugs(cls, query: str, tenant_id: str, limit: int = 15) -> List[Dict[str, Any]]:
         """
-        Searches across all 40,000+ Brand Drugs, Generics, Bengali names, and Barcodes.
-        If query is empty, returns the top popular essentials for instant mobile POS selection.
+        High-performance search across 40,000+ Brand Drugs, Generics, Bengali names, and Barcodes.
+        Optimized with Prefetch to resolve FEFO batches without N+1 query overhead.
         """
         query_clean = query.strip()
         today = timezone.now().date()
 
-        # Tenant-aware stock filter
+        # Tenant-aware batch filter
+        batch_filter = Q(current_stock__gt=0)
+        if tenant_id and tenant_id != "default_tenant":
+            batch_filter &= (Q(tenant_id=tenant_id) | Q(tenant__isnull=True))
+
+        fefo_prefetch = Prefetch(
+            "batches",
+            queryset=DrugBatch.objects.filter(batch_filter).order_by("expiry_date"),
+            to_attr="prefetched_fefo_batches"
+        )
+
         stock_filter = Q(batches__current_stock__gt=0, batches__expiry_date__gt=today)
         if tenant_id and tenant_id != "default_tenant":
             stock_filter &= (Q(batches__tenant_id=tenant_id) | Q(batches__tenant__isnull=True))
 
         if not query_clean:
-            # Return top popular daily essential medicines when search box is clicked
             popular_names = ["Napa", "Sergel", "Maxpro", "Seclo", "Monas", "Fexo", "Ace", "Cef-3", "Zimax", "Bislol"]
             db_qs = (
                 BrandDrug.objects.filter(brand_name__in=popular_names, is_active=True)
                 .select_related("generic", "manufacturer", "dosage_form")
-                .prefetch_related("batches")
+                .prefetch_related(fefo_prefetch)
                 .annotate(
                     available_stock=Sum(
                         "batches__current_stock",
@@ -56,7 +65,6 @@ class DrugSearchAndCacheService:
                 )[:limit]
             )
         else:
-            # Prioritize exact matches and starts-with matches
             db_qs = (
                 BrandDrug.objects.filter(
                     Q(brand_name__icontains=query_clean)
@@ -68,7 +76,7 @@ class DrugSearchAndCacheService:
                     is_active=True
                 )
                 .select_related("generic", "manufacturer", "dosage_form")
-                .prefetch_related("batches")
+                .prefetch_related(fefo_prefetch)
                 .annotate(
                     available_stock=Sum(
                         "batches__current_stock",
@@ -87,16 +95,10 @@ class DrugSearchAndCacheService:
 
         results = []
         for drug in db_qs:
-            batch_qs = drug.batches.all()
-            if tenant_id and tenant_id != "default_tenant":
-                tenant_batch_qs = batch_qs.filter(tenant_id=tenant_id)
-                if tenant_batch_qs.exists():
-                    batch_qs = tenant_batch_qs
-
-            fefo_batch = batch_qs.filter(current_stock__gt=0, expiry_date__gt=today).order_by("expiry_date").first()
-            if not fefo_batch:
-                # If no non-expired batch found, get any latest batch for pricing
-                fefo_batch = batch_qs.order_by("-expiry_date").first()
+            batches = getattr(drug, "prefetched_fefo_batches", [])
+            fefo_batch = next((b for b in batches if b.expiry_date and b.expiry_date > today), None)
+            if not fefo_batch and batches:
+                fefo_batch = batches[0]
 
             results.append({
                 "id": str(drug.id),

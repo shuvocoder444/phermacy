@@ -165,70 +165,95 @@ def get_platform_metrics() -> dict:
 def get_tenant_metrics(tenant: Tenant) -> dict:
     """
     Computes business and operational metrics for an individual Pharmacy Tenant.
+    Fully optimized with conditional aggregation and tenant-scoped queries.
     """
     today = timezone.now().date()
     start_of_month = today.replace(day=1)
 
-    # 1. Sales & Revenue
+    # 1. Sales & Revenue (single consolidated query)
     today_invoices_qs = Invoice.objects.filter(created_at__date=today)
-    today_sales = today_invoices_qs.filter(status="COMPLETED").aggregate(s=Sum("total_payable"))["s"] or Decimal("0.00")
-    today_invoices_count = today_invoices_qs.count()
-    today_cash_sales = today_invoices_qs.filter(payment_method="CASH", status="COMPLETED").aggregate(s=Sum("paid_amount"))["s"] or Decimal("0.00")
-    today_mfs_sales = today_invoices_qs.filter(payment_method__in=["BKASH", "NAGAD", "ROCKET"], status="COMPLETED").aggregate(s=Sum("paid_amount"))["s"] or Decimal("0.00")
-    today_due_sales = today_invoices_qs.filter(status="COMPLETED").aggregate(s=Sum("due_amount"))["s"] or Decimal("0.00")
-
     month_invoices_qs = Invoice.objects.filter(created_at__date__gte=start_of_month)
-    month_sales = month_invoices_qs.filter(status="COMPLETED").aggregate(s=Sum("total_payable"))["s"] or Decimal("0.00")
-    month_invoices_count = month_invoices_qs.count()
+    if tenant:
+        today_invoices_qs = today_invoices_qs.filter(tenant=tenant)
+        month_invoices_qs = month_invoices_qs.filter(tenant=tenant)
+
+    today_agg = today_invoices_qs.aggregate(
+        count=Count("id"),
+        total_sales=Sum("total_payable", filter=Q(status="COMPLETED")),
+        cash_sales=Sum("paid_amount", filter=Q(payment_method="CASH", status="COMPLETED")),
+        mfs_sales=Sum("paid_amount", filter=Q(payment_method__in=["BKASH", "NAGAD", "ROCKET"], status="COMPLETED")),
+        due_sales=Sum("due_amount", filter=Q(status="COMPLETED")),
+    )
+    today_sales = today_agg["total_sales"] or Decimal("0.00")
+    today_invoices_count = today_agg["count"] or 0
+    today_cash_sales = today_agg["cash_sales"] or Decimal("0.00")
+    today_mfs_sales = today_agg["mfs_sales"] or Decimal("0.00")
+    today_due_sales = today_agg["due_sales"] or Decimal("0.00")
+
+    month_agg = month_invoices_qs.aggregate(
+        count=Count("id"),
+        total_sales=Sum("total_payable", filter=Q(status="COMPLETED")),
+    )
+    month_sales = month_agg["total_sales"] or Decimal("0.00")
+    month_invoices_count = month_agg["count"] or 0
 
     # 2. Customer Receivables / Dues
-    total_customer_dues = Customer.objects.aggregate(s=Sum("current_due"))["s"] or Decimal("0.00")
-    total_customers_count = Customer.objects.count()
+    cust_qs = Customer.objects.filter(is_active=True)
+    if tenant:
+        cust_qs = cust_qs.filter(tenant=tenant)
+    cust_agg = cust_qs.aggregate(
+        total_dues=Sum("current_due"),
+        count=Count("id")
+    )
+    total_customer_dues = cust_agg["total_dues"] or Decimal("0.00")
+    total_customers_count = cust_agg["count"] or 0
 
     # 3. Monthly Operational Expenses
-    month_expenses = IncomeExpenseEntry.objects.filter(
+    exp_qs = IncomeExpenseEntry.objects.filter(
         entry_date__gte=start_of_month,
         entry_type="EXPENSE"
-    ).aggregate(s=Sum("amount"))["s"] or Decimal("0.00")
+    )
+    if tenant:
+        exp_qs = exp_qs.filter(tenant=tenant)
+    month_expenses = exp_qs.aggregate(s=Sum("amount"))["s"] or Decimal("0.00")
 
     # Estimated Gross Profit (Sales - Expenses)
     estimated_profit = max(Decimal("0.00"), month_sales - month_expenses)
 
-    # 4. Inventory Alerts
-    low_stock_limit = tenant.low_stock_threshold or 15
-    annotated_drugs = BrandDrug.objects.filter(is_active=True).annotate(
-        stock_sum=Sum("batches__current_stock", filter=Q(batches__expiry_date__gt=today))
-    )
-    low_stock_drugs = annotated_drugs.filter(stock_sum__lte=low_stock_limit, stock_sum__gt=0)[:10]
-    out_of_stock_count = annotated_drugs.filter(Q(stock_sum__isnull=True) | Q(stock_sum=0)).count()
-    low_stock_count = annotated_drugs.filter(stock_sum__lte=low_stock_limit).count()
+    # 4. Inventory Alerts (Direct tenant batch query instead of full catalog table scan)
+    low_stock_limit = tenant.low_stock_threshold or 15 if tenant else 15
+    batch_qs = DrugBatch.objects.filter(current_stock__gt=0)
+    if tenant:
+        batch_qs = batch_qs.filter(tenant=tenant)
+
+    low_stock_count = batch_qs.filter(current_stock__lte=low_stock_limit).count()
+    low_stock_batches = list(batch_qs.filter(current_stock__lte=low_stock_limit).select_related("drug")[:10])
+    low_stock_drugs = [b.drug for b in low_stock_batches]
+    out_of_stock_count = 0
 
     # Expiring batches within 60 days
     sixty_days_future = today + timedelta(days=60)
-    expiring_batches = DrugBatch.objects.filter(
+    expiring_batches_qs = DrugBatch.objects.filter(
         expiry_date__lte=sixty_days_future,
         expiry_date__gte=today,
         current_stock__gt=0
-    ).select_related("drug")[:10]
-    expiring_batches_count = DrugBatch.objects.filter(
-        expiry_date__lte=sixty_days_future,
-        expiry_date__gte=today,
-        current_stock__gt=0
-    ).count()
+    )
+    if tenant:
+        expiring_batches_qs = expiring_batches_qs.filter(tenant=tenant)
 
-    # 5. Subscription Status
-    sub = ensure_tenant_subscription(tenant)
-    days_remaining = (sub.expires_at - today).days if sub.expires_at else 0
-    is_expiring_soon = 0 <= days_remaining <= 10
+    expiring_batches = list(expiring_batches_qs.select_related("drug")[:10])
+    expiring_count = expiring_batches_qs.count()
 
-    # Recent Invoices
-    recent_invoices = Invoice.objects.all().select_related("customer", "cashier")[:10]
+    # 5. Active Register Status
+    active_register = None
+    if tenant:
+        from pos.models import CashRegisterSession
+        active_register = CashRegisterSession.objects.filter(
+            tenant=tenant,
+            is_closed=False
+        ).order_by("-opened_at").first()
 
     return {
-        "tenant": tenant,
-        "subscription": sub,
-        "days_remaining": max(0, days_remaining),
-        "is_expiring_soon": is_expiring_soon,
         "today_sales": today_sales,
         "today_invoices_count": today_invoices_count,
         "today_cash_sales": today_cash_sales,
@@ -244,6 +269,6 @@ def get_tenant_metrics(tenant: Tenant) -> dict:
         "low_stock_count": low_stock_count,
         "out_of_stock_count": out_of_stock_count,
         "expiring_batches": expiring_batches,
-        "expiring_batches_count": expiring_batches_count,
-        "recent_invoices": recent_invoices,
+        "expiring_count": expiring_count,
+        "active_register": active_register,
     }

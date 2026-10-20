@@ -51,8 +51,12 @@ def customer_dashboard(request):
     base_customers = Customer.objects.filter(is_active=True)
     if tenant:
         base_customers = base_customers.filter(tenant=tenant)
-    total_customers = base_customers.count()
-    total_due = base_customers.aggregate(t=Sum("current_due"))["t"] or Decimal("0.00")
+    cust_agg = base_customers.aggregate(
+        total_customers=Count("id"),
+        total_due=Sum("current_due")
+    )
+    total_customers = cust_agg["total_customers"] or 0
+    total_due = cust_agg["total_due"] or Decimal("0.00")
     
     # Due collected today
     today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)

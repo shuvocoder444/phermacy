@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from django.contrib import messages
 from django.core.paginator import Paginator
-from django.db.models import Q, Sum
+from django.db.models import Q, Sum, Count, F
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -38,18 +38,23 @@ def stock_dashboard(request):
     else:
         batch_qs = batch_qs.all()
 
-    # Metrics calculation
-    total_batches = batch_qs.filter(current_stock__gt=0).count()
-    total_units = batch_qs.aggregate(t=Sum("current_stock"))["t"] or 0
-    
-    # Valuation
-    total_tp_value = sum(b.current_stock * b.purchase_price for b in batch_qs.filter(current_stock__gt=0))
-    total_mrp_value = sum(b.current_stock * b.unit_mrp for b in batch_qs.filter(current_stock__gt=0))
-
-    # Alerts count
-    low_stock_count = batch_qs.filter(current_stock__gt=0, current_stock__lte=15).count()
-    expiring_soon_count = batch_qs.filter(current_stock__gt=0, expiry_date__gt=today, expiry_date__lte=expiry_60_days).count()
-    expired_count = batch_qs.filter(current_stock__gt=0, expiry_date__lte=today).count()
+    # Optimized single-query metrics calculation via SQL aggregation
+    metrics = batch_qs.aggregate(
+        total_batches=Count("id", filter=Q(current_stock__gt=0)),
+        total_units=Sum("current_stock"),
+        total_tp_value=Sum(F("current_stock") * F("purchase_price"), filter=Q(current_stock__gt=0)),
+        total_mrp_value=Sum(F("current_stock") * F("unit_mrp"), filter=Q(current_stock__gt=0)),
+        low_stock_count=Count("id", filter=Q(current_stock__gt=0, current_stock__lte=15)),
+        expiring_soon_count=Count("id", filter=Q(current_stock__gt=0, expiry_date__gt=today, expiry_date__lte=expiry_60_days)),
+        expired_count=Count("id", filter=Q(current_stock__gt=0, expiry_date__lte=today)),
+    )
+    total_batches = metrics["total_batches"] or 0
+    total_units = metrics["total_units"] or 0
+    total_tp_value = metrics["total_tp_value"] or Decimal("0.00")
+    total_mrp_value = metrics["total_mrp_value"] or Decimal("0.00")
+    low_stock_count = metrics["low_stock_count"] or 0
+    expiring_soon_count = metrics["expiring_soon_count"] or 0
+    expired_count = metrics["expired_count"] or 0
 
     # Search & Filter
     query = request.GET.get("q", "").strip()
@@ -162,7 +167,7 @@ def add_batch_view(request):
                 strength="Standard", 
                 unit_mrp=unit_mrp,
                 unit_tp=unit_tp,
-                is_active=True
+                is_active=True 
             )
         else:
             unit_mrp = Decimal(mrp_str) if mrp_str else drug.unit_mrp

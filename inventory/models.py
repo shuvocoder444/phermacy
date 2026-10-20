@@ -109,6 +109,7 @@ class BrandDrug(models.Model):
         ordering = ["brand_name"]
         indexes = [
             models.Index(fields=["brand_name", "generic"]),
+            models.Index(fields=["brand_name", "is_active"]),
             models.Index(fields=["barcode"]),
         ]
         verbose_name = _("Brand Drug")
@@ -178,6 +179,7 @@ class DrugBatch(models.Model):
         unique_together = ("drug", "batch_number")
         indexes = [
             models.Index(fields=["drug", "expiry_date", "current_stock"]),
+            models.Index(fields=["tenant", "current_stock", "expiry_date"]),
         ]
         verbose_name = _("Drug Batch")
         verbose_name_plural = _("Drug Batches")

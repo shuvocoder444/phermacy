@@ -9,8 +9,17 @@ from core.models import LedgerCategory, IncomeExpenseEntry
 from core.decorators import tenant_user_required
 
 
+_LEDGER_SEEDED = False
+
 def ensure_default_ledger_categories():
     """Initializes standard retail pharmacy income and expense categories."""
+    global _LEDGER_SEEDED
+    if _LEDGER_SEEDED:
+        return
+    if LedgerCategory.objects.exists():
+        _LEDGER_SEEDED = True
+        return
+    _LEDGER_SEEDED = True
     default_expenses = [
         ("Shop Rent", "দোকান ভাড়া"),
         ("Staff Salary & Daily Wage", "কর্মচারীর বেতন ও মজুরি"),
@@ -63,14 +72,19 @@ def ledger_dashboard_view(request):
     if tenant:
         base_qs = base_qs.filter(tenant=tenant)
 
-    # Today's metrics
-    today_income = base_qs.filter(entry_date=today, entry_type="INCOME").aggregate(s=Sum("amount"))["s"] or Decimal("0.00")
-    today_expense = base_qs.filter(entry_date=today, entry_type="EXPENSE").aggregate(s=Sum("amount"))["s"] or Decimal("0.00")
+    # Consolidated single query for Today's and Month's financial totals
+    metrics = base_qs.aggregate(
+        today_income=Sum("amount", filter=Q(entry_date=today, entry_type="INCOME")),
+        today_expense=Sum("amount", filter=Q(entry_date=today, entry_type="EXPENSE")),
+        month_income=Sum("amount", filter=Q(entry_date__gte=start_of_month, entry_type="INCOME")),
+        month_expense=Sum("amount", filter=Q(entry_date__gte=start_of_month, entry_type="EXPENSE")),
+    )
+    today_income = metrics["today_income"] or Decimal("0.00")
+    today_expense = metrics["today_expense"] or Decimal("0.00")
     today_net = today_income - today_expense
 
-    # Month's metrics
-    month_income = base_qs.filter(entry_date__gte=start_of_month, entry_type="INCOME").aggregate(s=Sum("amount"))["s"] or Decimal("0.00")
-    month_expense = base_qs.filter(entry_date__gte=start_of_month, entry_type="EXPENSE").aggregate(s=Sum("amount"))["s"] or Decimal("0.00")
+    month_income = metrics["month_income"] or Decimal("0.00")
+    month_expense = metrics["month_expense"] or Decimal("0.00")
     month_net = month_income - month_expense
 
     entries = base_qs.select_related("category", "recorded_by").all()[:50]

@@ -7,7 +7,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 
-from django.db.models import Q, Sum
+from django.db.models import Q, Sum, Count, Prefetch
 
 from inventory.models import BrandDrug, DrugBatch
 from inventory.services import DrugSearchAndCacheService
@@ -22,7 +22,7 @@ from core.decorators import tenant_user_required
 def get_popular_pos_drugs(tenant_key: str, limit: int = 35):
     """
     Retrieves top-selling, high-demand essential drugs with FEFO batch stock
-    for the POS quick-add side panel.
+    for the POS quick-add side panel. Fully optimized with prefetch to eliminate N+1 queries.
     """
     today = timezone.now().date()
     popular_names = [
@@ -33,20 +33,18 @@ def get_popular_pos_drugs(tenant_key: str, limit: int = 35):
         "Omidon 10", "Tasty Saline", "Montene 10", "Flamyd", "Sergel 40", "G-Met 500"
     ]
     
-    # Check top selling items from previous invoices if available
+    # Check top selling items from previous invoices if available (optimized)
     try:
+        inv_filter = Q(invoice__status="COMPLETED")
         if tenant_key and tenant_key != "default_tenant":
-            top_sales = list(
-                InvoiceItem.objects.filter(invoice__tenant_id=tenant_key)
-                .values_list('drug__brand_name', flat=True)
-                .distinct()[:15]
-            )
-        else:
-            top_sales = list(
-                InvoiceItem.objects.all()
-                .values_list('drug__brand_name', flat=True)
-                .distinct()[:15]
-            )
+            inv_filter &= Q(invoice__tenant_id=tenant_key)
+        top_sales = list(
+            InvoiceItem.objects.filter(inv_filter)
+            .values("drug__brand_name")
+            .annotate(sale_count=Count("id"))
+            .order_by("-sale_count")
+            .values_list("drug__brand_name", flat=True)[:10]
+        )
         for name in top_sales:
             if name and name not in popular_names:
                 popular_names.insert(0, name)
@@ -57,10 +55,20 @@ def get_popular_pos_drugs(tenant_key: str, limit: int = 35):
     if tenant_key and tenant_key != "default_tenant":
         stock_filter &= (Q(batches__tenant_id=tenant_key) | Q(batches__tenant__isnull=True))
 
+    batch_filter = Q(current_stock__gt=0)
+    if tenant_key and tenant_key != "default_tenant":
+        batch_filter &= (Q(tenant_id=tenant_key) | Q(tenant__isnull=True))
+
+    fefo_prefetch = Prefetch(
+        "batches",
+        queryset=DrugBatch.objects.filter(batch_filter).order_by("expiry_date"),
+        to_attr="prefetched_fefo_batches"
+    )
+
     qs = (
         BrandDrug.objects.filter(brand_name__in=popular_names, is_active=True)
         .select_related("generic", "manufacturer", "dosage_form")
-        .prefetch_related("batches")
+        .prefetch_related(fefo_prefetch)
         .annotate(available_stock=Sum("batches__current_stock", filter=stock_filter))
     )
 
@@ -72,16 +80,14 @@ def get_popular_pos_drugs(tenant_key: str, limit: int = 35):
             continue
         seen.add(key)
 
-        batch_qs = drug.batches.all()
-        if tenant_key and tenant_key != "default_tenant":
-            tb_qs = batch_qs.filter(tenant_id=tenant_key)
-            if tb_qs.exists():
-                batch_qs = tb_qs
+        batches = getattr(drug, "prefetched_fefo_batches", [])
+        if not batches:
+            continue
 
-        fefo_batch = batch_qs.filter(current_stock__gt=0, expiry_date__gt=today).order_by("expiry_date").first()
-        if not fefo_batch:
-            # Fallback to any active batch if none strictly non-expired
-            fefo_batch = batch_qs.order_by("-expiry_date").first()
+        # In-memory FEFO resolution (zero additional DB queries)
+        fefo_batch = next((b for b in batches if b.expiry_date and b.expiry_date > today), None)
+        if not fefo_batch and batches:
+            fefo_batch = batches[0]
 
         if not fefo_batch:
             continue
@@ -117,7 +123,6 @@ def get_popular_pos_drugs(tenant_key: str, limit: int = 35):
             break
 
     return results
-
 
 def get_cart_manager(request) -> POSCartManager:
     """Helper to retrieve or initialize tenant-scoped Redis cart."""
