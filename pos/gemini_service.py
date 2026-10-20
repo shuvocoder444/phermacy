@@ -23,9 +23,9 @@ logger = logging.getLogger(__name__)
 AI_CONFIG_PATH = os.path.join(settings.BASE_DIR, "media", "ai_config.json")
 CACHE_KEY_AI_CONFIG = "pos:ai_system_config"
 GEMINI_MODELS = [
-    "gemini-3.5-flash",
-    "gemini-3.8-flash",
-    "gemini-flash-latest",
+    "gemini-1.5-flash",
+    "gemini-2.0-flash",
+    "gemini-1.5-flash-8b",
 ]
 
 
@@ -204,11 +204,12 @@ class GeminiAIService:
             ],
             "generationConfig": {
                 "temperature": 0.1,
+                "maxOutputTokens": 200,
                 "response_mime_type": "application/json",
             }
         }
 
-        success, data = cls._execute_gemini_request(api_key, payload, timeout=18)
+        success, data = cls._execute_gemini_request(api_key, payload, timeout=8)
         if not success or not isinstance(data, dict):
             logger.error("Gemini Vision analysis failed: %s", data)
             return None
@@ -253,6 +254,7 @@ class GeminiAIService:
             ],
             "generationConfig": {
                 "temperature": 0.1,
+                "maxOutputTokens": 200,
                 "response_mime_type": "application/json",
             }
         }

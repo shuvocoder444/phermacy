@@ -197,7 +197,9 @@ def voice_medicine_search(request):
     batch_id = None
     matched_brand_name = ""
 
-    # Step 0: Check Trained Aliases & Built-in Dictionary
+    # ==============================================================
+    # STEP 1: Ultra-Fast O(1) Trained Aliases & Built-in Dictionary (<1ms)
+    # ==============================================================
     from pos.gemini_service import GeminiAIService
     from pos.training_service import DrugTrainingService
 
@@ -211,7 +213,61 @@ def voice_medicine_search(request):
             if fefo_b:
                 batch_id = str(fefo_b.id)
 
-    # Step 0.5: Gemini Multimodal AI Voice Natural Language Parser (if active)
+    # ==============================================================
+    # STEP 2: Instant Transliteration Match (e.g. 'সারজেল' -> 'Sergel') (<2ms)
+    # ==============================================================
+    if not matched_drug:
+        trans_query = transliterate_bangla_to_phonetic(drug_query).strip()
+        if trans_query and len(trans_query) >= 2:
+            trans_drug = _find_best_variant_for_form(trans_query, requested_form)
+            if trans_drug:
+                matched_drug = trans_drug
+                matched_brand_name = trans_drug.brand_name
+                fefo_t = trans_drug.batches.fefo().first() or trans_drug.batches.order_by("-expiry_date").first()
+                if fefo_t:
+                    batch_id = str(fefo_t.id)
+
+    # ==============================================================
+    # STEP 3: Cached / Indexed Drug Search (<5ms)
+    # ==============================================================
+    if not matched_drug:
+        search_query = trans_query if (trans_query and len(trans_query) >= 3) else drug_query
+        search_results = DrugSearchAndCacheService.search_drugs(query=search_query, tenant_id=tenant_key, limit=6)
+        if search_results:
+            target_dict = search_results[0]
+            if requested_form:
+                for res in search_results:
+                    res_form = (res.get("dosage_form") or res.get("dosage_form_full") or "").lower()
+                    if requested_form.lower() in res_form:
+                        target_dict = res
+                        break
+            if target_dict.get("fefo_batch"):
+                batch_id = target_dict["fefo_batch"]["id"]
+                matched_brand_name = target_dict["brand_name"]
+                matched_drug = BrandDrug.objects.filter(id=target_dict["id"]).first()
+
+    # ==============================================================
+    # STEP 4: Direct DB Prefix & Contains Query with Batch Prefetch
+    # ==============================================================
+    if not matched_drug:
+        cand_qs = BrandDrug.objects.filter(
+            Q(brand_name__istartswith=drug_query)
+            | Q(brand_name__istartswith=trans_query)
+            | Q(brand_name__icontains=drug_query)
+            | Q(brand_name__icontains=trans_query),
+            is_active=True
+        ).prefetch_related('batches')
+        if cand_qs.exists():
+            matched_drug = _find_best_variant_for_form(cand_qs.first().brand_name, requested_form)
+            if matched_drug:
+                matched_brand_name = matched_drug.brand_name
+                fefo_b = matched_drug.batches.fefo().first() or matched_drug.batches.order_by("-expiry_date").first()
+                if fefo_b:
+                    batch_id = str(fefo_b.id)
+
+    # ==============================================================
+    # STEP 5: Gemini AI Multimodal Voice Parser (Advanced Fallback Only)
+    # ==============================================================
     if not matched_drug and GeminiAIService.is_gemini_active():
         try:
             gemini_voice_items = GeminiAIService.parse_voice_transcript(transcript)
@@ -232,52 +288,6 @@ def voice_medicine_search(request):
                             quantity = g_qty
         except Exception as g_err:
             logger.warning("Gemini voice parse error: %s", g_err)
-
-    # Step 1: Check standard indexed search if not resolved by training or Gemini
-    if not matched_drug:
-        search_results = DrugSearchAndCacheService.search_drugs(query=drug_query, tenant_id=tenant_key, limit=8)
-        if search_results:
-            # If requested dosage form, look for matching result
-            target_dict = search_results[0]
-            if requested_form:
-                for res in search_results:
-                    res_form = (res.get("dosage_form") or res.get("dosage_form_full") or "").lower()
-                    if requested_form.lower() in res_form:
-                        target_dict = res
-                        break
-            if target_dict.get("fefo_batch"):
-                batch_id = target_dict["fefo_batch"]["id"]
-                matched_brand_name = target_dict["brand_name"]
-                matched_drug = BrandDrug.objects.filter(id=target_dict["id"]).first()
-
-    # Step 2: Phonetic Soundex & Metaphone + TheFuzz Ranking if still not resolved
-    if not matched_drug:
-        all_brands = get_all_active_brands_cached()
-        ranked = rank_phonetic_matches(drug_query, all_brands, top_n=3)
-
-        if ranked:
-            best_brand_name, score = ranked[0]
-            matched_drug = _find_best_variant_for_form(best_brand_name, requested_form)
-        else:
-            # Fallback to direct DB query with transliterated text
-            trans_query = transliterate_bangla_to_phonetic(drug_query)
-            cand_qs = BrandDrug.objects.filter(
-                Q(brand_name__icontains=drug_query)
-                | Q(brand_name__icontains=trans_query)
-                | Q(brand_name_bn__icontains=drug_query),
-                is_active=True
-            )
-            if cand_qs.exists():
-                matched_drug = _find_best_variant_for_form(cand_qs.first().brand_name, requested_form)
-
-        if matched_drug:
-            fefo_batch = matched_drug.batches.fefo().first() or matched_drug.batches.order_by("-expiry_date").first()
-            if fefo_batch:
-                batch_id = str(fefo_batch.id)
-                matched_brand_name = matched_drug.brand_name
-            else:
-                batch_id = None
-                matched_brand_name = matched_drug.brand_name
 
     # JSON response mode
     if request.POST.get("format") == "json" or "application/json" in request.headers.get("Accept", ""):

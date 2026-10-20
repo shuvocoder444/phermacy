@@ -6,6 +6,7 @@
         x-data="{ show: true }" 
         x-show="show" 
         x-init="
+            try { if (typeof playCartAddSound === 'function') playCartAddSound(); } catch(e){}
             try {
                 let msg = new SpeechSynthesisUtterance('{{ voice_success.medicine }} {{ voice_success.quantity }} টি যোগ করা হয়েছে');
                 msg.lang = 'bn-BD';

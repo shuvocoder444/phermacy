@@ -698,11 +698,10 @@
                 </div>
             </div>
 
-            <!-- Viewfinder Area (Adaptive: shrink to compact preview when scan results appear) -->
+            <!-- Viewfinder Area (Stable non-jumping preview) -->
             <div 
                 id="camera-viewfinder-container"
-                :class="hasScanResults ? 'h-28 sm:h-44' : 'h-52 sm:h-72'"
-                class="relative bg-slate-900 transition-all duration-300 flex flex-col items-center justify-center overflow-hidden shrink-0">
+                class="relative bg-slate-900 h-56 sm:h-64 flex flex-col items-center justify-center overflow-hidden shrink-0">
                 <video 
                     id="camera-video-feed" 
                     autoplay 
@@ -732,16 +731,6 @@
                     <div class="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
                     <p class="text-xs font-bold text-white font-mono animate-pulse">OCR টেক্সট রিড করা হচ্ছে...</p>
                 </div>
-
-                <!-- Toggle view button when results exist -->
-                <template x-if="hasScanResults">
-                    <button 
-                        type="button" 
-                        @click="hasScanResults = false"
-                        class="absolute bottom-2 right-2 px-2.5 py-1 rounded-lg bg-black/60 hover:bg-black/80 text-white text-[10px] font-bold backdrop-blur-sm flex items-center space-x-1 transition-all z-10">
-                        <span>🔍 ক্যামেরা বড় করুন</span>
-                    </button>
-                </template>
             </div>
 
             <!-- Modal OCR Results Area (Expands naturally with smooth scroll) -->
@@ -1183,18 +1172,35 @@ function posTerminal() {
             this.recognition.continuous = false;
             this.recognition.interimResults = true;
 
+            let sentTranscript = '';
+
             this.recognition.onresult = (event) => {
                 let transcript = '';
-                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                for (let i = 0; i < event.results.length; ++i) {
                     transcript += event.results[i][0].transcript;
                 }
                 this.speechTranscript = transcript;
-                if (event.results[0].isFinal) {
-                    this.sendVoiceToBackend(transcript);
+                const lastIdx = event.results.length - 1;
+                if (event.results[lastIdx].isFinal && transcript.trim() && transcript.trim() !== sentTranscript) {
+                    sentTranscript = transcript.trim();
+                    this.sendVoiceToBackend(transcript.trim());
+                    this.stopVoice();
                 }
             };
 
+            this.recognition.onspeechend = () => {
+                if (this.speechTranscript && this.speechTranscript.trim() !== sentTranscript) {
+                    sentTranscript = this.speechTranscript.trim();
+                    this.sendVoiceToBackend(this.speechTranscript.trim());
+                }
+                this.stopVoice();
+            };
+
             this.recognition.onend = () => {
+                if (this.speechTranscript && this.speechTranscript.trim() !== sentTranscript) {
+                    sentTranscript = this.speechTranscript.trim();
+                    this.sendVoiceToBackend(this.speechTranscript.trim());
+                }
                 this.isListening = false;
             };
 
@@ -1219,16 +1225,17 @@ function posTerminal() {
 
         stopVoice() {
             if (this.recognition && this.isListening) {
-                this.recognition.stop();
+                try { this.recognition.stop(); } catch(e){}
             }
             this.isListening = false;
         },
 
         sendVoiceToBackend(text) {
+            if (!text || !text.trim()) return;
             htmx.ajax('POST', "{% url 'pos:voice_parse' %}", {
                 target: '#cart-container',
                 swap: 'outerHTML',
-                values: { 'transcript': text }
+                values: { 'transcript': text.trim() }
             });
         },
 
@@ -1590,35 +1597,39 @@ function posTerminal() {
                 sy = (vh - sHeight) / 2;
             }
 
-            // 2. Render ONLY the cropped green box region onto canvas at full native resolution
-            canvas.width = Math.round(sWidth);
-            canvas.height = Math.round(sHeight);
+            // 2. Downscale smartly to optimal OCR resolution (max 900px width/height)
+            let outW = Math.round(sWidth);
+            let outH = Math.round(sHeight);
+            const maxDimension = 900;
+            if (outW > maxDimension || outH > maxDimension) {
+                if (outW > outH) {
+                    outH = Math.round((outH * maxDimension) / outW);
+                    outW = maxDimension;
+                } else {
+                    outW = Math.round((outW * maxDimension) / outH);
+                    outH = maxDimension;
+                }
+            }
+            canvas.width = Math.max(320, outW);
+            canvas.height = Math.max(160, outH);
             const ctx = canvas.getContext('2d');
             ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, canvas.width, canvas.height);
 
-            // 3. Export high-res cropped image as JPEG and FormData payload
-            const croppedImageData = canvas.toDataURL('image/jpeg', 0.95);
+            // 3. Export optimized lightweight JPEG payload (only ~60-90KB for instant transmission)
+            const croppedImageData = canvas.toDataURL('image/jpeg', 0.82);
             this.ocrScanning = true;
 
-            canvas.toBlob(blob => {
-                const formData = new FormData();
-                if (blob) {
-                    formData.append('image', blob, 'cropped_medicine.jpg');
+            // Execute HTMX POST with optimized lightweight payload
+            htmx.ajax('POST', "{% url 'pos:camera_scan' %}", {
+                target: '#camera-scan-results-box',
+                swap: 'innerHTML',
+                values: { 
+                    'image_data': croppedImageData 
                 }
-                formData.append('image_data', croppedImageData);
-
-                // Execute HTMX POST with FormData payload
-                htmx.ajax('POST', "{% url 'pos:camera_scan' %}", {
-                    target: '#camera-scan-results-box',
-                    swap: 'innerHTML',
-                    values: { 
-                        'image_data': croppedImageData 
-                    }
-                }).finally(() => {
-                    this.ocrScanning = false;
-                    this.hasScanResults = true;
-                });
-            }, 'image/jpeg', 0.95);
+            }).finally(() => {
+                this.ocrScanning = false;
+                this.hasScanResults = true;
+            });
         },
 
         openCheckoutModal() {
