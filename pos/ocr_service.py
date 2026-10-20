@@ -294,6 +294,8 @@ def _gemini_scan_response(request, raw_bytes: bytes):
         })
     except Exception as err:
         logger.warning("Gemini Vision processing error: %s", err)
+        if "quota" in str(err).lower() or "429" in str(err):
+            request._gemini_quota_error = True
         return None
 
 
@@ -543,6 +545,7 @@ def scan_medicine_ocr(request):
                 "primary_brand_name": primary_brand,
                 "raw_text": clean_text[:150],
                 "ai_engine": "local",
+                "quota_warning": getattr(request, "_gemini_quota_error", False),
             })
 
         # JSON response

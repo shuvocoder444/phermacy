@@ -144,6 +144,15 @@
 </div>
 {% else %}
 <div class="p-3 sm:p-5 text-center text-slate-600 bg-white rounded-2xl border border-slate-200 space-y-3">
+    {% if quota_warning %}
+    <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-left text-xs text-amber-900 flex items-start gap-2">
+        <span class="text-base">⚠️</span>
+        <div>
+            <div class="font-bold">Google Gemini API কোটা (Daily Free Quota) শেষ হয়েছে!</div>
+            <div class="text-[11px] text-amber-800 mt-0.5">গুগল ফ্রি টিয়ারের ২০টি রিকোয়েস্টের দৈনিক লিমিট শেষ। অনুগ্রহ করে Google AI Studio থেকে আপনার দ্বিতীয় API Key (...HV5w) কপি করে উপরে <strong>[🤖 AI]</strong> সেটিংসে পেস্ট করে সংরক্ষণ করুন।</div>
+        </div>
+    </div>
+    {% endif %}
     {% if primary_brand_name %}
     <div class="p-3.5 sm:p-4 bg-gradient-to-r from-emerald-50 via-teal-50 to-cyan-50 border-2 border-emerald-500 rounded-2xl shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 text-left">
         <div class="flex items-center space-x-3 min-w-0">
