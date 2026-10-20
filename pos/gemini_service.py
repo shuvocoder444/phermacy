@@ -21,10 +21,10 @@ ENV_FILE_PATH = os.path.join(settings.BASE_DIR, ".env")
 CACHE_KEY_AI_CONFIG = "pos:ai_system_config"
 GEMINI_MODELS = [
     "gemini-3.5-flash",
-    "gemini-flash-latest",
-    "gemini-2.5-flash",
     "gemini-3.5-flash-lite",
-    "gemini-3.8-flash",
+    "gemini-3.1-flash-lite",
+    "gemini-2.5-flash",
+    "gemini-flash-latest",
 ]
 
 
@@ -274,14 +274,14 @@ class GeminiAIService:
             ],
             "generationConfig": {
                 "temperature": 0.1,
-                "maxOutputTokens": 200,
+                "maxOutputTokens": 1000,
                 "response_mime_type": "application/json",
             }
         }
 
         # Vision is an optional assist; keep its worst-case delay bounded so a
         # slow provider does not stall the cashier for two full model timeouts.
-        success, data = cls._execute_gemini_request(api_key, payload, timeout=12)
+        success, data = cls._execute_gemini_request(api_key, payload, timeout=15)
         if not success or not isinstance(data, dict):
             logger.error("Gemini Vision analysis failed: %s", data)
             return None
@@ -333,7 +333,7 @@ class GeminiAIService:
             ],
             "generationConfig": {
                 "temperature": 0.1,
-                "maxOutputTokens": 200,
+                "maxOutputTokens": 1000,
                 "response_mime_type": "application/json",
             }
         }

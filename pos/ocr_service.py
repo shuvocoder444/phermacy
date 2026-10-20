@@ -356,7 +356,15 @@ def scan_medicine_ocr(request):
             raw_bytes = buffer.tobytes()
 
         # ==============================================================
-        # PRIORITY 1: Local Enhanced Multi-Pass OCR Pipeline
+        # PRIORITY 1: Multimodal AI Vision (Google Gemini) - Instant & Accurate
+        # ==============================================================
+        if GeminiAIService.is_gemini_active():
+            gemini_response = _gemini_scan_response(request, raw_bytes)
+            if gemini_response is not None:
+                return gemini_response
+
+        # ==============================================================
+        # PRIORITY 2: Local Enhanced Multi-Pass OCR Pipeline
         # (Proven accurate on foil strips, bottles, and packaging)
         # ==============================================================
         img_resized = cv2.resize(img, None, fx=2.0, fy=2.0, interpolation=cv2.INTER_CUBIC)
