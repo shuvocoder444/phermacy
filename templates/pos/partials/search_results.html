@@ -7,8 +7,26 @@
         @click="addDrugBatch('{{ drug.fefo_batch.id }}'); searchOpen = false;"
         @keydown.enter.prevent="addDrugBatch('{{ drug.fefo_batch.id }}'); searchOpen = false;"
         {% else %}
-        @click="alert('{{ drug.brand_name|escapejs }} এর কোনো স্টক নেই। স্টক ইন করুন।'); $dispatch('open-stock-in'); searchOpen = false;"
-        @keydown.enter.prevent="alert('{{ drug.brand_name|escapejs }} এর কোনো স্টক নেই। স্টক ইন করুন।'); $dispatch('open-stock-in'); searchOpen = false;"
+        @click="$dispatch('open-stock-in', {
+            drugId: '{{ drug.id }}',
+            brandName: '{{ drug.brand_name|escapejs }}',
+            strength: '{{ drug.strength|escapejs }}',
+            genericName: '{{ drug.generic_name|escapejs }}',
+            dosageForm: '{{ drug.dosage_form|escapejs }}',
+            manufacturer: '{{ drug.manufacturer|escapejs }}',
+            unitMrp: '{{ drug.unit_mrp }}',
+            unitTp: '{{ drug.unit_tp }}'
+        }); searchOpen = false;"
+        @keydown.enter.prevent="$dispatch('open-stock-in', {
+            drugId: '{{ drug.id }}',
+            brandName: '{{ drug.brand_name|escapejs }}',
+            strength: '{{ drug.strength|escapejs }}',
+            genericName: '{{ drug.generic_name|escapejs }}',
+            dosageForm: '{{ drug.dosage_form|escapejs }}',
+            manufacturer: '{{ drug.manufacturer|escapejs }}',
+            unitMrp: '{{ drug.unit_mrp }}',
+            unitTp: '{{ drug.unit_tp }}'
+        }); searchOpen = false;"
         {% endif %}
         class="search-result-item flex items-center justify-between p-3 rounded-2xl cursor-pointer transition-all border border-transparent hover:border-emerald-300 hover:bg-emerald-50/50 focus:bg-emerald-50 focus:border-emerald-500 focus:outline-none group">
         

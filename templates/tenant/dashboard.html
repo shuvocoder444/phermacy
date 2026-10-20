@@ -153,7 +153,7 @@
                         <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">আজকের মোট বিক্রয়</span>
                         <span class="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-lg">💰</span>
                     </div>
-                    <div class="mt-3 text-3xl font-black text-emerald-700 font-mono">৳{{ today_sales }}</div>
+                    <div class="mt-3 text-3xl font-black text-emerald-700 font-mono">৳{{ today_sales|floatformat:2 }}</div>
                     <div class="mt-2 text-xs text-slate-500 font-semibold">
                         মোট ইনভয়েস: <strong class="text-slate-800 font-mono">{{ today_invoices_count }} টি</strong>
                     </div>
@@ -165,7 +165,7 @@
                         <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">ক্যাশ আদায় (ক্যাশ ড্রয়ার)</span>
                         <span class="w-9 h-9 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center text-lg">💵</span>
                     </div>
-                    <div class="mt-3 text-3xl font-black text-teal-700 font-mono">৳{{ today_cash_sales }}</div>
+                    <div class="mt-3 text-3xl font-black text-teal-700 font-mono">৳{{ today_cash_sales|floatformat:2 }}</div>
                     <div class="mt-2 text-xs text-slate-500 font-semibold">
                         ড্রয়ারে প্রাপ্ত নগদ অর্থ
                     </div>
@@ -177,7 +177,7 @@
                         <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">বিকাশ / নগদ / কার্ড</span>
                         <span class="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center text-lg">📱</span>
                     </div>
-                    <div class="mt-3 text-3xl font-black text-rose-600 font-mono">৳{{ today_mfs_sales }}</div>
+                    <div class="mt-3 text-3xl font-black text-rose-600 font-mono">৳{{ today_mfs_sales|floatformat:2 }}</div>
                     <div class="mt-2 text-xs text-slate-500 font-semibold">
                         ডিজিটাল ও মোবাইল পেমেন্ট
                     </div>
@@ -189,7 +189,7 @@
                         <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">আজকের বাকি বিক্রয়</span>
                         <span class="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-lg">📒</span>
                     </div>
-                    <div class="mt-3 text-3xl font-black text-amber-600 font-mono">৳{{ today_due_sales }}</div>
+                    <div class="mt-3 text-3xl font-black text-amber-600 font-mono">৳{{ today_due_sales|floatformat:2 }}</div>
                     <div class="mt-2 text-xs text-slate-500 font-semibold">
                         আজকের বাকি খাতার এন্ট্রি
                     </div>
@@ -213,28 +213,28 @@
                 <!-- Month Total Sales -->
                 <div class="p-5 rounded-3xl bg-white border border-slate-200 shadow-sm">
                     <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">মাসিক মোট বিক্রয়</span>
-                    <div class="mt-2 text-2xl font-black text-slate-800 font-mono">৳{{ month_sales }}</div>
+                    <div class="mt-2 text-2xl font-black text-slate-800 font-mono">৳{{ month_sales|floatformat:2 }}</div>
                     <div class="mt-1 text-xs text-slate-400">ইনভয়েস: {{ month_invoices_count }} টি</div>
                 </div>
 
                 <!-- Customer Total Dues -->
                 <div class="p-5 rounded-3xl bg-white border border-slate-200 shadow-sm">
                     <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">মোট বাকি পাওনা (কাস্টমার)</span>
-                    <div class="mt-2 text-2xl font-black text-rose-600 font-mono">৳{{ total_customer_dues }}</div>
+                    <div class="mt-2 text-2xl font-black text-rose-600 font-mono">৳{{ total_customer_dues|floatformat:2 }}</div>
                     <div class="mt-1 text-xs text-slate-400">বাকি খাতার গ্রাহক: {{ total_customers_count }} জন</div>
                 </div>
 
                 <!-- Monthly Operational Expenses -->
                 <div class="p-5 rounded-3xl bg-white border border-slate-200 shadow-sm">
                     <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">দোকানের মোট খরচ (লেজার)</span>
-                    <div class="mt-2 text-2xl font-black text-indigo-600 font-mono">৳{{ month_expenses }}</div>
+                    <div class="mt-2 text-2xl font-black text-indigo-600 font-mono">৳{{ month_expenses|floatformat:2 }}</div>
                     <div class="mt-1 text-xs text-slate-400">ভাড়া, বেতন, বিদ্যুৎ বিল ও অন্য খরচ</div>
                 </div>
 
                 <!-- Estimated Gross Profit -->
                 <div class="p-5 rounded-3xl bg-emerald-50/80 border border-emerald-200 shadow-sm">
                     <span class="text-xs font-bold text-emerald-800 uppercase tracking-wider">আনুমানিক নেট ব্যালেন্স</span>
-                    <div class="mt-2 text-2xl font-black text-emerald-700 font-mono">৳{{ estimated_profit }}</div>
+                    <div class="mt-2 text-2xl font-black text-emerald-700 font-mono">৳{{ estimated_profit|floatformat:2 }}</div>
                     <div class="mt-1 text-xs text-emerald-600 font-semibold">বিক্রয় বিয়োগ দোকান খরচ</div>
                 </div>
             </div>
@@ -362,7 +362,7 @@
                                     {{ inv.get_payment_method_display }}
                                 </span>
                             </td>
-                            <td class="py-3 px-4 font-black font-mono text-emerald-700">৳{{ inv.total_payable }}</td>
+                            <td class="py-3 px-4 font-black font-mono text-emerald-700">৳{{ inv.total_payable|floatformat:2 }}</td>
                             <td class="py-3 px-4 text-slate-400 text-[11px] font-mono">{{ inv.created_at|date:"d M Y, h:i A" }}</td>
                             <td class="py-3 px-4">
                                 <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
@@ -370,7 +370,7 @@
                                 </span>
                             </td>
                             <td class="py-3 px-4 text-right">
-                                <a href="{% url 'pos:thermal_receipt' inv.id %}" target="_blank" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px]">
+                                <a href="{% url 'pos:print_receipt' inv.id %}" target="_blank" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px]">
                                     🖨️ প্রিন্ট
                                 </a>
                             </td>

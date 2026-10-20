@@ -184,17 +184,25 @@ def get_tenant_metrics(tenant: Tenant) -> dict:
         mfs_sales=Sum("paid_amount", filter=Q(payment_method__in=["BKASH", "NAGAD", "ROCKET"], status="COMPLETED")),
         due_sales=Sum("due_amount", filter=Q(status="COMPLETED")),
     )
-    today_sales = today_agg["total_sales"] or Decimal("0.00")
+    def _quantize_money(val):
+        if val is None:
+            return Decimal("0.00")
+        try:
+            return Decimal(str(val)).quantize(Decimal("0.01"))
+        except Exception:
+            return Decimal("0.00")
+
+    today_sales = _quantize_money(today_agg["total_sales"])
     today_invoices_count = today_agg["count"] or 0
-    today_cash_sales = today_agg["cash_sales"] or Decimal("0.00")
-    today_mfs_sales = today_agg["mfs_sales"] or Decimal("0.00")
-    today_due_sales = today_agg["due_sales"] or Decimal("0.00")
+    today_cash_sales = _quantize_money(today_agg["cash_sales"])
+    today_mfs_sales = _quantize_money(today_agg["mfs_sales"])
+    today_due_sales = _quantize_money(today_agg["due_sales"])
 
     month_agg = month_invoices_qs.aggregate(
         count=Count("id"),
         total_sales=Sum("total_payable", filter=Q(status="COMPLETED")),
     )
-    month_sales = month_agg["total_sales"] or Decimal("0.00")
+    month_sales = _quantize_money(month_agg["total_sales"])
     month_invoices_count = month_agg["count"] or 0
 
     # 2. Customer Receivables / Dues
@@ -205,7 +213,7 @@ def get_tenant_metrics(tenant: Tenant) -> dict:
         total_dues=Sum("current_due"),
         count=Count("id")
     )
-    total_customer_dues = cust_agg["total_dues"] or Decimal("0.00")
+    total_customer_dues = _quantize_money(cust_agg["total_dues"])
     total_customers_count = cust_agg["count"] or 0
 
     # 3. Monthly Operational Expenses
@@ -215,10 +223,10 @@ def get_tenant_metrics(tenant: Tenant) -> dict:
     )
     if tenant:
         exp_qs = exp_qs.filter(tenant=tenant)
-    month_expenses = exp_qs.aggregate(s=Sum("amount"))["s"] or Decimal("0.00")
+    month_expenses = _quantize_money(exp_qs.aggregate(s=Sum("amount"))["s"])
 
     # Estimated Gross Profit (Sales - Expenses)
-    estimated_profit = max(Decimal("0.00"), month_sales - month_expenses)
+    estimated_profit = _quantize_money(max(Decimal("0.00"), month_sales - month_expenses))
 
     # 4. Inventory Alerts (Direct tenant batch query instead of full catalog table scan)
     low_stock_limit = tenant.low_stock_threshold or 15 if tenant else 15

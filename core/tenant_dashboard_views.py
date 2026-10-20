@@ -33,16 +33,63 @@ def tenant_dashboard_view(request):
         return redirect("login")
 
     ensure_default_subscription_plans()
+    subscription = ensure_tenant_subscription(tenant)
     metrics = get_tenant_metrics(tenant)
-    available_plans = SubscriptionPlan.objects.filter(is_active=True).order_by("monthly_price_bdt")
+    now_date = timezone.now().date()
+
+    from pos.models import Invoice
+    recent_invoices = (
+        Invoice.objects.filter(tenant=tenant)
+        .select_related("customer")
+        .order_by("-created_at")[:10]
+    )
 
     context = {
         **metrics,
-        "available_plans": available_plans,
-        "now_date": timezone.now().date(),
+        "now_date": now_date,
+        "subscription": subscription,
+        "days_remaining": max(0, (subscription.expires_at - now_date).days),
+        "is_expiring_soon": 0 <= (subscription.expires_at - now_date).days <= 7,
         "tenant": tenant,
+        "recent_invoices": recent_invoices,
     }
     return render(request, "tenant/dashboard.html", context)
+
+
+@tenant_user_required
+def tenant_settings_page(request):
+    tenant = getattr(request, "tenant", None)
+    if not tenant and hasattr(request.user, "staff_profile") and request.user.staff_profile:
+        tenant = request.user.staff_profile.tenant
+    if not tenant and request.user.is_superuser:
+        tenant = Tenant.objects.first()
+    if not tenant:
+        messages.error(request, "ফার্মেসি প্রোফাইল পাওয়া যায়নি।")
+        return redirect("login")
+    return render(request, "tenant/settings.html", {"tenant": tenant})
+
+
+@tenant_user_required
+def tenant_subscription_page(request):
+    tenant = getattr(request, "tenant", None)
+    if not tenant and hasattr(request.user, "staff_profile") and request.user.staff_profile:
+        tenant = request.user.staff_profile.tenant
+    if not tenant and request.user.is_superuser:
+        tenant = Tenant.objects.first()
+    if not tenant:
+        messages.error(request, "ফার্মেসি প্রোফাইল পাওয়া যায়নি।")
+        return redirect("login")
+
+    ensure_default_subscription_plans()
+    subscription = ensure_tenant_subscription(tenant)
+    now_date = timezone.now().date()
+    context = {
+        "tenant": tenant,
+        "subscription": subscription,
+        "days_remaining": max(0, (subscription.expires_at - now_date).days),
+        "available_plans": SubscriptionPlan.objects.filter(is_active=True).order_by("monthly_price_bdt"),
+    }
+    return render(request, "tenant/subscription.html", context)
 
 
 @tenant_user_required
@@ -61,14 +108,21 @@ def tenant_settings_update(request):
         messages.error(request, "ফার্মেসি পাওয়া যায়নি।")
         return redirect("login")
 
-    tenant.name = request.POST.get("name", tenant.name).strip()
-    tenant.name_bn = request.POST.get("name_bn", tenant.name_bn).strip()
-    tenant.phone = request.POST.get("phone", tenant.phone).strip()
-    tenant.email = request.POST.get("email", tenant.email).strip()
-    tenant.address = request.POST.get("address", tenant.address).strip()
-    tenant.drug_license_number = request.POST.get("drug_license_number", tenant.drug_license_number).strip()
-    tenant.trade_license_number = request.POST.get("trade_license_number", tenant.trade_license_number).strip()
-    tenant.vat_reg_number = request.POST.get("vat_reg_number", tenant.vat_reg_number).strip()
+    profile = getattr(request.user, "staff_profile", None)
+    if not request.user.is_superuser and (not profile or profile.role.lower() != "owner"):
+        return HttpResponse("Only the pharmacy owner can update pharmacy settings.", status=403)
+
+    def posted_text(field, current):
+        return (request.POST.get(field, current) or "").strip()
+
+    tenant.name = posted_text("name", tenant.name)
+    tenant.name_bn = posted_text("name_bn", tenant.name_bn)
+    tenant.phone = posted_text("phone", tenant.phone)
+    tenant.email = posted_text("email", tenant.email)
+    tenant.address = posted_text("address", tenant.address)
+    tenant.drug_license_number = posted_text("drug_license_number", tenant.drug_license_number)
+    tenant.trade_license_number = posted_text("trade_license_number", tenant.trade_license_number)
+    tenant.vat_reg_number = posted_text("vat_reg_number", tenant.vat_reg_number)
     
     try:
         tenant.default_vat_rate = Decimal(request.POST.get("default_vat_rate", str(tenant.default_vat_rate)))
@@ -76,7 +130,22 @@ def tenant_settings_update(request):
     except Exception:
         pass
 
+    uploaded_logo = request.FILES.get("logo")
+    if uploaded_logo:
+        try:
+            from PIL import Image
+            image = Image.open(uploaded_logo)
+            image.verify()
+            valid_logo = image.format in {"JPEG", "PNG", "WEBP"}
+        except Exception:
+            valid_logo = False
+        if not valid_logo or uploaded_logo.size > 2 * 1024 * 1024:
+            messages.error(request, "লোগো JPG/PNG/WebP হতে হবে এবং ২ MB-এর মধ্যে হতে হবে।")
+            return redirect("tenant_dashboard:settings")
+        uploaded_logo.seek(0)
+        tenant.logo = uploaded_logo
+
     tenant.save()
     messages.success(request, "ফার্মেসির প্রোফাইল ও সেটিংস সফলভাবে সংরক্ষিত হয়েছে!")
-    return redirect("tenant_dashboard:dashboard")
+    return redirect("tenant_dashboard:settings")
 

@@ -177,6 +177,7 @@
                     <input 
                         type="number" 
                         x-model="quantity"
+                        id="stock-in-quantity-field"
                         required 
                         min="1" 
                         class="flex-1 bg-white border border-slate-300 rounded-xl px-3 py-2 text-center text-sm font-black font-mono text-teal-700 focus:ring-2 focus:ring-teal-500 focus:outline-none shadow-inner">
@@ -318,12 +319,48 @@ function stockInController() {
             this.isOpen = true;
             this.successMsg = '';
             this.errorMsg = '';
-            if (initialData && initialData.brandName) {
-                this.brandName = initialData.brandName;
-                this.searchDrugs();
+            this.generateAutoBatch();
+            this.quantity = 100;
+
+            if (initialData) {
+                if (typeof initialData === 'string') {
+                    initialData = { brandName: initialData };
+                }
+
+                this.drugId = initialData.drugId || initialData.id || '';
+                this.brandName = initialData.brandName || '';
+                
+                const mrp = (initialData.unitMrp && initialData.unitMrp !== 'None') ? initialData.unitMrp : '';
+                const tp = (initialData.unitTp && initialData.unitTp !== 'None') ? initialData.unitTp : (initialData.purchasePrice || '');
+                this.unitMrp = mrp;
+                this.purchasePrice = tp;
+
+                if (this.brandName) {
+                    this.selectedDrug = {
+                        id: this.drugId,
+                        brand_name: this.brandName,
+                        strength: initialData.strength || '',
+                        generic: initialData.genericName || initialData.generic || '',
+                        generic_name: initialData.genericName || initialData.generic || '',
+                        manufacturer: initialData.manufacturer || '',
+                        dosage_form: initialData.dosageForm || 'Tab',
+                        unit_mrp: this.unitMrp,
+                        unit_tp: this.purchasePrice,
+                    };
+                    this.showDropdown = false;
+                }
+            } else {
+                this.clearSelectedDrug();
             }
+
             this.$nextTick(() => {
-                this.$refs.brandInput?.focus();
+                const qtyInput = document.getElementById('stock-in-quantity-field');
+                if (this.selectedDrug && qtyInput) {
+                    qtyInput.focus();
+                    qtyInput.select();
+                } else if (this.$refs.brandInput) {
+                    this.$refs.brandInput.focus();
+                }
             });
         },
 
@@ -436,6 +473,21 @@ function stockInController() {
 
                     this.successMsg = data.message || 'স্টক সফলভাবে ইনওয়ার্ড হয়েছে!';
                     
+                    // If on POS screen and new batch created, automatically add it directly to active POS cart!
+                    if (data.batch_id && typeof addDrugBatch === 'function') {
+                        try {
+                            addDrugBatch(data.batch_id);
+                        } catch(e) {}
+                    }
+
+                    // Refresh search panel if search input is active
+                    try {
+                        const searchInput = document.getElementById('drug-search-input');
+                        if (searchInput && searchInput.value) {
+                            searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+                        }
+                    } catch(e) {}
+
                     if (continueAdding) {
                         // Reset for next medicine
                         this.clearSelectedDrug();
@@ -449,7 +501,7 @@ function stockInController() {
                             if (window.location.pathname.includes('/inventory')) {
                                 window.location.reload();
                             }
-                        }, 900);
+                        }, 800);
                     }
                 } else {
                     this.errorMsg = data.message || 'স্টক যোগ করতে ত্রুটি হয়েছে।';
