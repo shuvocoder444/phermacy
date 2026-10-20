@@ -88,11 +88,12 @@ if os.path.exists("/home/webkoders/pos.webkoders.com"):
         }
     }
 
-# Cache Backend (Fast Local Memory Cache with Redis-ready structure)
+# Cache Backend (Persistent Database Cache shared across all Passenger worker processes)
 CACHES = {
     "default": {
-        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-        "LOCATION": "pharmaflow-cache",
+        "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+        "LOCATION": "pos_cache_table",
+        "TIMEOUT": 86400,
     }
 }
 

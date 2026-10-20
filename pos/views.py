@@ -233,10 +233,17 @@ def cart_add_htmx(request):
     """
     batch_id = request.POST.get("batch_id")
     quantity = int(request.POST.get("quantity", 1))
-    
+    batch_ids_json = request.POST.get("batch_ids", "")
+
     cart_manager = get_cart_manager(request)
     try:
-        cart = cart_manager.add_item(batch_id=batch_id, quantity=quantity)
+        if batch_ids_json:
+            batch_ids = json.loads(batch_ids_json)
+            if not isinstance(batch_ids, list) or len(batch_ids) > 100:
+                return HttpResponse("Invalid batch list", status=400)
+            cart = cart_manager.add_items([(str(item), quantity) for item in batch_ids])
+        else:
+            cart = cart_manager.add_item(batch_id=batch_id, quantity=quantity)
     except Exception as e:
         return HttpResponse(f"<div class='p-2 text-red-600 font-semibold'>Error: {str(e)}</div>", status=400)
 
@@ -453,11 +460,15 @@ def checkout_submit_htmx(request):
 
     except Exception as e:
         return HttpResponse(
-            f"""<div class="p-4 bg-red-100 border-l-4 border-red-500 text-red-700">
-                <p class="font-bold">Checkout Error</p>
-                <p>{str(e)}</p>
+            f"""<div class="p-6 text-center space-y-4 bg-white rounded-3xl">
+                <div class="w-14 h-14 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto text-2xl font-bold">✕</div>
+                <h3 class="text-base font-black text-rose-700">পেমেন্ট সম্পন্ন করা সম্ভব হয়নি</h3>
+                <p class="text-xs text-slate-600 bg-rose-50 border border-rose-200 p-3 rounded-xl font-medium">{str(e)}</p>
+                <div class="pt-2 flex justify-center space-x-2">
+                    <button type="button" @click="checkoutModalOpen = false" class="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl cursor-pointer">বাতিল করুন</button>
+                </div>
             </div>""",
-            status=400
+            status=200
         )
 
 

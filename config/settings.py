@@ -103,11 +103,9 @@ LOGOUT_REDIRECT_URL = "login"
 
 CACHES = {
     "default": {
-        "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": os.environ.get("REDIS_URL", "redis://127.0.0.1:6379/0"),
-        "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
-        "KEY_PREFIX": "pharmacy",
-        "TIMEOUT": 300,
+        "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+        "LOCATION": "pos_cache_table",
+        "TIMEOUT": 86400,
     }
 }
 CHANNEL_LAYERS = {

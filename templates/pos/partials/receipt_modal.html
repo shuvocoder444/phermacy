@@ -1,50 +1,50 @@
-<div class="p-6 text-center" x-data x-init="
+<div class="p-6 text-center bg-slate-900 text-white rounded-3xl overflow-hidden" x-data x-init="
     // Auto-trigger browser thermal print dialog
     setTimeout(() => {
         let printFrame = document.getElementById('thermal-print-frame');
-        if (printFrame) {
-            printFrame.contentWindow.print();
+        if (printFrame && printFrame.contentWindow) {
+            try { printFrame.contentWindow.print(); } catch(e) {}
         }
-    }, 400);
+    }, 450);
 ">
-    <!-- Success Badge -->
+    <!-- Success Icon Badge -->
     <div class="w-16 h-16 mx-auto mb-3 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center">
         <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
         </svg>
     </div>
 
-    <h3 class="text-xl font-black text-white">Sale Completed Successfully!</h3>
-    <p class="text-sm font-mono text-emerald-400 mt-1">Invoice #{{ invoice.invoice_number }}</p>
+    <h3 class="text-xl font-black text-white">বিক্রি সফলভাবে সম্পন্ন হয়েছে!</h3>
+    <p class="text-sm font-mono text-emerald-400 mt-1 font-bold">ইনভয়েস #{{ invoice.invoice_number }}</p>
 
-    <!-- Summary Details -->
-    <div class="my-5 p-4 bg-slate-950/60 rounded-xl border border-slate-800 text-left text-xs space-y-2">
-        <div class="flex justify-between text-slate-300">
-            <span>Customer:</span>
+    <!-- Summary Details Card -->
+    <div class="my-5 p-4 bg-slate-950/80 rounded-2xl border border-slate-800 text-left text-xs space-y-2.5">
+        <div class="flex justify-between items-center text-slate-300">
+            <span>কাস্টমার:</span>
             <span class="font-bold text-white">{{ invoice.customer_name_walkin }}</span>
         </div>
-        <div class="flex justify-between text-slate-300">
-            <span>Payment Method:</span>
+        <div class="flex justify-between items-center text-slate-300">
+            <span>পেমেন্ট মাধ্যম:</span>
             <span class="font-semibold text-emerald-400">{{ invoice.get_payment_method_display }}</span>
         </div>
-        <div class="flex justify-between text-slate-300">
-            <span>Total Payable:</span>
-            <span class="font-bold font-mono text-white">৳{{ invoice.total_payable }}</span>
+        <div class="flex justify-between items-center text-slate-300 border-t border-slate-800/80 pt-1.5">
+            <span>সর্বমোট প্রদেয়:</span>
+            <span class="font-black font-mono text-white text-sm">৳{{ invoice.total_payable }}</span>
         </div>
-        <div class="flex justify-between text-slate-300">
-            <span>Paid:</span>
-            <span class="font-bold font-mono text-emerald-400">৳{{ invoice.paid_amount }}</span>
+        <div class="flex justify-between items-center text-slate-300">
+            <span>পরিশোধিত টাকা:</span>
+            <span class="font-bold font-mono text-emerald-400 text-sm">৳{{ invoice.paid_amount }}</span>
         </div>
         {% if invoice.due_amount > 0 %}
-        <div class="flex justify-between text-rose-400 font-bold border-t border-slate-800 pt-1">
-            <span>New Due (Baki):</span>
-            <span class="font-mono">৳{{ invoice.due_amount }}</span>
+        <div class="flex justify-between items-center text-rose-400 font-bold border-t border-slate-800 pt-1.5">
+            <span>নতুন বকেয়া (Due):</span>
+            <span class="font-mono text-sm">৳{{ invoice.due_amount }}</span>
         </div>
         {% endif %}
         {% if invoice.change_returned > 0 %}
-        <div class="flex justify-between text-cyan-400 font-bold">
-            <span>Change Returned:</span>
-            <span class="font-mono">৳{{ invoice.change_returned }}</span>
+        <div class="flex justify-between items-center text-cyan-400 font-bold">
+            <span>ফেরত দেওয়া টাকা:</span>
+            <span class="font-mono text-sm">৳{{ invoice.change_returned }}</span>
         </div>
         {% endif %}
     </div>
@@ -57,19 +57,18 @@
         <a 
             href="{% url 'pos:print_receipt' invoice.id %}" 
             target="_blank"
-            class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs flex items-center space-x-2 transition-colors">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs flex items-center space-x-1.5 transition-colors cursor-pointer border border-slate-700">
+            <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
             </svg>
-            <span>Reprint Receipt</span>
+            <span>স্লিপ প্রিন্ট</span>
         </a>
         
         <button 
             type="button" 
-            @click="$dispatch('close-modal'); window.location.reload();"
-            class="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-900/50 transition-all">
-            New Sale (Next Customer) [ESC / Enter]
+            @click="checkoutModalOpen = false; window.location.reload();"
+            class="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs shadow-lg shadow-emerald-900/50 transition-all cursor-pointer">
+            নতুন বিক্রি (পরবর্তী কাস্টমার) [Enter]
         </button>
     </div>
 </div>
-

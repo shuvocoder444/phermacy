@@ -30,8 +30,13 @@
         </div>
     </div>
 
-    <!-- Form -->
-    <form hx-post="{% url 'pos:checkout_submit' %}" hx-target="#modal-content" class="mt-4 sm:mt-5 space-y-3 sm:space-y-4">
+    <!-- Form with correct Target and CSRF Token -->
+    <form 
+        hx-post="{% url 'pos:checkout_submit' %}" 
+        hx-target="#checkout-modal-content" 
+        hx-swap="innerHTML"
+        class="mt-4 sm:mt-5 space-y-3 sm:space-y-4">
+        {% csrf_token %}
         
         <!-- Customer & Due Details -->
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 bg-slate-50 p-3 sm:p-4 rounded-2xl border border-slate-200">
@@ -63,35 +68,35 @@
                     type="button" 
                     @click="paymentMethod = 'CASH'; paidAmount = totalPayable"
                     :class="paymentMethod === 'CASH' ? 'bg-emerald-600 text-white border-emerald-600 ring-2 ring-emerald-400' : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'"
-                    class="p-2 sm:p-3 rounded-2xl border text-xs font-bold text-center transition-all shadow-sm active:scale-95">
+                    class="p-2 sm:p-3 rounded-2xl border text-xs font-bold text-center transition-all shadow-sm active:scale-95 cursor-pointer">
                     💵 ক্যাশ
                 </button>
                 <button 
                     type="button" 
                     @click="paymentMethod = 'BKASH'; paidAmount = totalPayable"
                     :class="paymentMethod === 'BKASH' ? 'bg-[#D12053] text-white border-pink-500 ring-2 ring-pink-400' : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'"
-                    class="p-2 sm:p-3 rounded-2xl border text-xs font-bold text-center transition-all shadow-sm active:scale-95">
+                    class="p-2 sm:p-3 rounded-2xl border text-xs font-bold text-center transition-all shadow-sm active:scale-95 cursor-pointer">
                     bKash
                 </button>
                 <button 
                     type="button" 
                     @click="paymentMethod = 'NAGAD'; paidAmount = totalPayable"
                     :class="paymentMethod === 'NAGAD' ? 'bg-[#F7931E] text-white border-amber-500 ring-2 ring-amber-400' : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'"
-                    class="p-2 sm:p-3 rounded-2xl border text-xs font-bold text-center transition-all shadow-sm active:scale-95">
+                    class="p-2 sm:p-3 rounded-2xl border text-xs font-bold text-center transition-all shadow-sm active:scale-95 cursor-pointer">
                     Nagad
                 </button>
                 <button 
                     type="button" 
                     @click="paymentMethod = 'ROCKET'; paidAmount = totalPayable"
                     :class="paymentMethod === 'ROCKET' ? 'bg-[#8B1A8B] text-white border-purple-500 ring-2 ring-purple-400' : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'"
-                    class="p-2 sm:p-3 rounded-2xl border text-xs font-bold text-center transition-all shadow-sm active:scale-95">
+                    class="p-2 sm:p-3 rounded-2xl border text-xs font-bold text-center transition-all shadow-sm active:scale-95 cursor-pointer">
                     Rocket
                 </button>
                 <button 
                     type="button" 
                     @click="paymentMethod = 'DUE'; paidAmount = 0"
                     :class="paymentMethod === 'DUE' ? 'bg-rose-600 text-white border-rose-600 ring-2 ring-rose-400' : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'"
-                    class="col-span-2 sm:col-span-1 p-2 sm:p-3 rounded-2xl border text-xs font-bold text-center transition-all shadow-sm active:scale-95">
+                    class="col-span-2 sm:col-span-1 p-2 sm:p-3 rounded-2xl border text-xs font-bold text-center transition-all shadow-sm active:scale-95 cursor-pointer">
                     📜 বাকি (Due)
                 </button>
             </div>
@@ -136,12 +141,12 @@
             <button 
                 type="button" 
                 @click="checkoutModalOpen = false; $dispatch('close-modal')"
-                class="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors">
+                class="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer">
                 বাতিল
             </button>
             <button 
                 type="submit" 
-                class="px-5 sm:px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs sm:text-sm shadow-lg shadow-emerald-600/25 flex items-center space-x-2 transition-all active:scale-95">
+                class="px-5 sm:px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs sm:text-sm shadow-lg shadow-emerald-600/25 flex items-center space-x-2 transition-all active:scale-95 cursor-pointer">
                 <span>কনফার্ম ও স্লিপ প্রিন্ট</span>
                 <kbd class="hidden sm:inline-block px-1.5 py-0.5 rounded bg-emerald-800 text-xs font-mono">Enter</kbd>
             </button>
