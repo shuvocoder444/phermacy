@@ -49,6 +49,64 @@
         @keyframes page-loading { from { transform: scaleX(.08); } to { transform: scaleX(.82); } }
         @media (min-width: 1024px) {
             body.dashboard-sidebar-collapsed .dashboard-sidebar-wrapper { display: none !important; }
+            .dashboard-layout-container {
+                height: 100vh !important;
+                height: 100dvh !important;
+                max-height: 100vh !important;
+                overflow: hidden !important;
+                display: flex !important;
+                flex-direction: row !important;
+                width: 100% !important;
+            }
+            .dashboard-sidebar-wrapper {
+                width: 18rem !important;
+                height: 100vh !important;
+                height: 100dvh !important;
+                max-height: 100vh !important;
+                flex-shrink: 0 !important;
+                display: flex !important;
+                flex-direction: column !important;
+                position: static !important;
+                overflow: hidden !important;
+                z-index: 30 !important;
+            }
+            .dashboard-sidebar-wrapper aside {
+                height: 100% !important;
+                max-height: 100% !important;
+            }
+            .dashboard-main-content {
+                flex: 1 1 0% !important;
+                min-width: 0 !important;
+                min-height: 0 !important;
+                height: 100vh !important;
+                height: 100dvh !important;
+                max-height: 100vh !important;
+                overflow-y: auto !important;
+                overflow-x: hidden !important;
+                -webkit-overflow-scrolling: touch !important;
+                display: flex !important;
+                flex-direction: column !important;
+            }
+        }
+        @media (max-width: 1023.98px) {
+            .dashboard-layout-container {
+                min-height: 100vh !important;
+                display: flex !important;
+                flex-direction: column !important;
+                width: 100% !important;
+                overflow: visible !important;
+            }
+            .dashboard-sidebar-wrapper {
+                display: none !important;
+            }
+            .dashboard-main-content {
+                flex: 1 1 auto !important;
+                min-width: 0 !important;
+                height: auto !important;
+                overflow: visible !important;
+                display: flex !important;
+                flex-direction: column !important;
+            }
         }
         .tenant-sidebar-nav { overflow-anchor: none; scroll-behavior: smooth; }
         .tenant-sidebar-nav a[aria-current="page"] {
