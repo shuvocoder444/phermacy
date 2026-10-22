@@ -20,7 +20,7 @@
             type="button" 
             @click="window.matchMedia('(min-width: 1024px)').matches ? window.toggleDashboardSidebar() : (sidebarOpen = false)" 
             class="p-1.5 px-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 border border-slate-700 transition-all text-xs font-bold"
-            title="সাইডবার মেনু লুকান (Hide Sidebar)">
+            title="সাইডবার মেনু বন্ধ করুন">
             <span class="hidden lg:inline">◀</span>
             <span class="lg:hidden text-sm">&times;</span>
         </button>
@@ -43,7 +43,7 @@
         <a href="{% url 'pos:screen' %}" {% if active_tab == 'pos' %}aria-current="page"{% endif %}
            class="flex items-center space-x-3 px-3.5 py-3 rounded-2xl transition-all text-slate-300 hover:bg-slate-800 hover:text-white">
             <span class="text-base">⚡</span>
-            <span>পিওএস সেলস স্ক্রিন</span>
+            <span>পিওএস বিক্রয় স্ক্রিন</span>
         </a>
 
         <a href="{% url 'tenant_dashboard:sales' %}" {% if active_tab == 'sales' %}aria-current="page"{% endif %} class="flex items-center space-x-3 px-3.5 py-3 rounded-2xl transition-all text-slate-300 hover:bg-slate-800 hover:text-white">
@@ -55,7 +55,7 @@
         <a href="{% url 'inventory:dashboard' %}" {% if active_tab == 'inventory' %}aria-current="page"{% endif %}
            class="flex items-center space-x-3 px-3.5 py-3 rounded-2xl transition-all text-slate-300 hover:bg-slate-800 hover:text-white">
             <span class="text-base">📦</span>
-            <span>ইনভেন্টরি ও স্টক (FEFO)</span>
+            <span>ওষুধ স্টক ও ইনভেন্টরি</span>
         </a>
 
         <!-- 4. Customers & Due Ledger -->
@@ -94,7 +94,7 @@
             <a href="{% url 'saas_admin:dashboard' %}" 
                class="flex items-center space-x-3 px-3.5 py-2.5 rounded-2xl bg-indigo-950/60 text-indigo-300 border border-indigo-700/50 hover:bg-indigo-900/60 transition-all">
                 <span class="text-base">👑</span>
-                <span>SaaS Super Admin</span>
+                <span>সুপার এডমিন কন্ট্রোল</span>
             </a>
         </div>
         {% endif %}

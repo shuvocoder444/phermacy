@@ -36,8 +36,14 @@ def tenant_user_required(view_func):
         # Tenant pages always need an explicit tenant context, including for super admins.
         if request.user.is_superuser:
             if not getattr(request, "tenant", None):
-                messages.error(request, "প্রথমে একটি সক্রিয় ফার্মেসি নির্বাচন করুন।")
-                return redirect("saas_admin:dashboard")
+                from core.models import Tenant
+                fallback_tenant = Tenant.objects.filter(is_active=True).first()
+                if fallback_tenant:
+                    request.tenant = fallback_tenant
+                    request.session["active_tenant_id"] = str(fallback_tenant.id)
+                else:
+                    messages.error(request, "প্রথমে একটি সক্রিয় ফার্মেসি নির্বাচন করুন।")
+                    return redirect("saas_admin:dashboard")
             return view_func(request, *args, **kwargs)
 
         profile = getattr(request.user, "staff_profile", None)

@@ -238,30 +238,23 @@ def get_tenant_metrics(tenant: Tenant) -> dict:
     # Estimated Gross Profit (Sales - Expenses)
     estimated_profit = _quantize_money(month_sales - month_expenses)
 
-    # 4. Inventory Alerts (Direct tenant batch query instead of full catalog table scan)
+    # 4. Inventory Alerts (Direct indexed DrugBatch query - ultra-fast sub-second execution)
     low_stock_limit = tenant.low_stock_threshold if tenant else 15
     if low_stock_limit is None:
         low_stock_limit = 15
-    active_drugs = BrandDrug.objects.filter(is_active=True)
+
+    batch_base = DrugBatch.objects.all()
     if tenant:
-        active_drugs = active_drugs.filter(tenant=tenant)
-    sellable_batch_filter = Q(batches__expiry_date__gt=today, batches__current_stock__gt=0)
-    if tenant:
-        sellable_batch_filter &= Q(batches__tenant=tenant)
-    drugs_with_sellable_stock = active_drugs.annotate(
-        dashboard_stock=Sum(
-            "batches__current_stock",
-            filter=sellable_batch_filter,
-            default=0,
-        )
+        batch_base = batch_base.filter(tenant=tenant)
+
+    low_batches_qs = batch_base.filter(
+        current_stock__gt=0,
+        current_stock__lte=low_stock_limit,
+        expiry_date__gt=today
     )
-    low_stock_drugs_qs = drugs_with_sellable_stock.filter(
-        dashboard_stock__gt=0,
-        dashboard_stock__lte=low_stock_limit,
-    ).select_related("dosage_form").order_by("dashboard_stock", "brand_name")
-    low_stock_count = low_stock_drugs_qs.count()
-    low_stock_drugs = list(low_stock_drugs_qs[:10])
-    out_of_stock_count = drugs_with_sellable_stock.filter(dashboard_stock=0).count()
+    low_stock_count = low_batches_qs.count()
+    low_stock_drugs = list(low_batches_qs.select_related("drug", "drug__dosage_form")[:10])
+    out_of_stock_count = batch_base.filter(current_stock=0).count()
 
     # Expiring batches within 60 days
     sixty_days_future = today + timedelta(days=60)

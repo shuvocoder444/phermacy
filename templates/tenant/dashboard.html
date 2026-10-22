@@ -4,14 +4,14 @@
 
 {% block content %}
 <style>
+    /* Smooth native touch scrolling for iOS Safari & Android */
     html, body {
-        height: 100% !important;
-        overflow: hidden !important;
         background-color: #f1f5f9 !important;
+        -webkit-overflow-scrolling: touch;
     }
 </style>
 
-<div x-data="{ sidebarOpen: false }" class="h-screen w-full bg-slate-100 flex flex-col lg:flex-row overflow-hidden font-sans">
+<div x-data="{ sidebarOpen: false }" class="min-h-screen w-full bg-slate-100 flex flex-col lg:flex-row font-sans">
 
     <!-- Mobile Top Bar with Drawer Toggle -->
     <div class="lg:hidden bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between sticky top-0 z-40 shrink-0">
@@ -51,7 +51,7 @@
     </div>
 
     <!-- Desktop Sidebar -->
-    <div class="dashboard-sidebar-wrapper hidden lg:block shrink-0 h-screen">
+    <div class="dashboard-sidebar-wrapper hidden lg:block shrink-0 min-h-screen sticky top-0 h-screen">
         {% include "partials/tenant_sidebar.html" with active_tab="dashboard" %}
     </div>
 
@@ -141,7 +141,7 @@
             <div class="flex items-center justify-between mb-3">
                 <h2 class="text-sm font-extrabold text-slate-800 flex items-center space-x-1.5">
                     <span>📅</span>
-                    <span>আজকের বিক্রয় ও ক্যাশ হিসাব ({{ now_date|date:"d M Y" }})</span>
+                    <span>আজকের বিক্রয় ও নগদ হিসাব ({{ now_date|date:"d M Y" }})</span>
                 </h2>
                 <span class="text-xs text-slate-500">লাইভ আপডেট</span>
             </div>
@@ -162,7 +162,7 @@
                 <!-- Today Cash Sales -->
                 <div class="p-5 rounded-3xl bg-white border border-slate-200 shadow-sm relative overflow-hidden">
                     <div class="flex items-center justify-between">
-                        <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">ক্যাশ আদায় (ক্যাশ ড্রয়ার)</span>
+                        <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">নগদ আদায়</span>
                         <span class="w-9 h-9 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center text-lg">💵</span>
                     </div>
                     <div class="mt-3 text-3xl font-black text-teal-700 font-mono">৳{{ today_cash_sales|floatformat:2 }}</div>
@@ -219,14 +219,14 @@
 
                 <!-- Customer Total Dues -->
                 <div class="p-5 rounded-3xl bg-white border border-slate-200 shadow-sm">
-                    <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">মোট বাকি পাওনা (কাস্টমার)</span>
+                    <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">গ্রাহকের মোট বকেয়া পাওনা</span>
                     <div class="mt-2 text-2xl font-black text-rose-600 font-mono">৳{{ total_customer_dues|floatformat:2 }}</div>
                     <div class="mt-1 text-xs text-slate-400">বাকি খাতার গ্রাহক: {{ total_customers_count }} জন</div>
                 </div>
 
                 <!-- Monthly Operational Expenses -->
                 <div class="p-5 rounded-3xl bg-white border border-slate-200 shadow-sm">
-                    <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">দোকানের মোট খরচ (লেজার)</span>
+                    <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">দোকানের মোট খরচ</span>
                     <div class="mt-2 text-2xl font-black text-indigo-600 font-mono">৳{{ month_expenses|floatformat:2 }}</div>
                     <div class="mt-1 text-xs text-slate-400">ভাড়া, বেতন, বিদ্যুৎ বিল ও অন্য খরচ</div>
                 </div>
@@ -319,7 +319,7 @@
                                 <td class="py-2.5 px-3 text-right font-black text-slate-700 font-mono">{{ b.current_stock }} পিস</td>
                             </tr>
                             {% empty %}
-                            <tr><td colspan="3" class="text-center py-4 text-emerald-600 font-bold">✓ আগামী ৬০ দিনে মেয়াদোত্তীর্ণ কোনো ব্যাচ নেই!</td></tr>
+                            <tr><td colspan="3" class="text-center py-4 text-emerald-600 font-bold">✓ আগামী ৬০ দিনে মেয়াদ শেষ কোনো ব্যাচ নেই!</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>

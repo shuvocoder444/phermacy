@@ -3,13 +3,14 @@
     <table class="w-full text-left border-collapse text-xs">
         <thead>
             <tr class="bg-slate-50 border-b border-slate-200 text-slate-600 font-extrabold uppercase tracking-wider text-[11px]">
-                <th class="py-3 px-4">ঔষধ ও জেনেরিক</th>
+                <th class="py-3 px-4">ওষুধ ও জেনেরিক</th>
                 <th class="py-3 px-3">ব্যাচ নম্বর</th>
-                <th class="py-3 px-3">মেয়াদ (FEFO)</th>
-                <th class="py-3 px-3 text-right">ক্রয়মূল্য (TP)</th>
-                <th class="py-3 px-3 text-right">বিক্রয়মূল্য (MRP)</th>
+                <th class="py-3 px-3">মেয়াদ</th>
+                <th class="py-3 px-3 text-right">ক্রয়মূল্য</th>
+                <th class="py-3 px-3 text-right">বিক্রয়মূল্য</th>
                 <th class="py-3 px-3 text-center">মজুদ স্টক</th>
-                <th class="py-3 px-4 text-right">স্টক ভ্যালু (MRP)</th>
+                <th class="py-3 px-4 text-right">মোট মূল্য</th>
+                <th class="py-3 px-3 text-center">অ্যাকশন</th>
             </tr>
         </thead>
         <tbody class="divide-y divide-slate-100 font-semibold text-slate-700">
@@ -19,7 +20,7 @@
                 <td class="py-3 px-4">
                     <div class="flex items-center space-x-2">
                         <span class="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-bold">
-                            {{ batch.drug.dosage_form.short_name|default:batch.drug.dosage_form.name }}
+                            {{ batch.drug.dosage_form.name|default:batch.drug.dosage_form.short_name }}
                         </span>
                         <div>
                             <span class="font-extrabold text-slate-900 text-xs sm:text-sm">{{ batch.drug.brand_name }}</span>
@@ -46,7 +47,7 @@
                     <div class="font-mono text-slate-800">{{ batch.expiry_date|date:"d M Y" }}</div>
                     {% if batch.expiry_date <= today %}
                     <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700 border border-rose-200">
-                        ❌ মেয়াদোত্তীর্ণ
+                        ❌ মেয়াদ শেষ
                     </span>
                     {% elif batch.expiry_date <= expiry_60_days %}
                     <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
@@ -90,13 +91,40 @@
                 <td class="py-3 px-4 text-right font-mono font-black text-slate-800">
                     ৳{{ batch.stock_value|floatformat:2|intcomma }}
                 </td>
+
+                <!-- Actions: Edit & Delete -->
+                <td class="py-3 px-3 text-center whitespace-nowrap">
+                    <div class="flex items-center justify-center space-x-1.5">
+                        <!-- Edit Button -->
+                        <button 
+                            type="button"
+                            hx-get="{% url 'inventory:edit_batch' batch.id %}"
+                            hx-target="#global-modal-container"
+                            hx-swap="innerHTML"
+                            class="p-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition-all active:scale-95 shadow-xs"
+                            title="স্টক ও ব্যাচ এডিট করুন">
+                            <span class="text-sm">✏️</span>
+                        </button>
+
+                        <!-- Delete Button with Confirmation Form -->
+                        <form action="{% url 'inventory:delete_batch' batch.id %}" method="POST" onsubmit="return confirm('আপনি কি নিশ্চিত যে \'{{ batch.drug.brand_name|escapejs }}\' (ব্যাচ: {{ batch.batch_number|escapejs }}) ডিলিট করতে চান?');" class="inline">
+                            {% csrf_token %}
+                            <button 
+                                type="submit"
+                                class="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-all active:scale-95 shadow-xs"
+                                title="ব্যাচ ডিলিট করুন">
+                                <span class="text-sm">🗑️</span>
+                            </button>
+                        </form>
+                    </div>
+                </td>
             </tr>
             {% empty %}
             <tr>
-                <td colspan="7" class="py-12 text-center text-slate-400">
+                <td colspan="8" class="py-12 text-center text-slate-400">
                     <div class="text-3xl mb-2">🔍</div>
-                    <p class="font-bold text-slate-600">কোনো ঔষধের স্টক পাওয়া যায়নি</p>
-                    <p class="text-xs">ফিল্টার পরিবর্তন করুন অথবা 'নতুন ব্যাচ / স্টক ইন' বাটনে ক্লিক করে স্টক যুক্ত করুন।</p>
+                    <p class="font-bold text-slate-600">কোনো ওষুধের স্টক পাওয়া যায়নি</p>
+                    <p class="text-xs">ফিল্টার পরিবর্তন করুন অথবা 'নতুন স্টক যোগ' বাটনে ক্লিক করে স্টক যুক্ত করুন।</p>
                 </td>
             </tr>
             {% endfor %}
@@ -126,4 +154,3 @@
     </div>
 </div>
 {% endif %}
-

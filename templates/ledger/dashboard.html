@@ -1,28 +1,87 @@
 {% extends "base.html" %}
 
-{% block title %}আয় ও ব্যয় ক্যাশ বুক (Ledger) | PharmaFlow POS{% endblock %}
+{% block title %}আয় ও ব্যয় হিসাব খাতা | {{ tenant.name }}{% endblock %}
 
 {% block content %}
-<div class="flex flex-col lg:flex-row h-screen bg-slate-50 overflow-hidden font-sans text-slate-800 relative" x-data="{
+<style>
+    /* Smooth native touch scrolling for iOS Safari & Android */
+    html, body {
+        background-color: #f1f5f9 !important;
+        -webkit-overflow-scrolling: touch;
+    }
+</style>
+
+<div class="flex flex-col lg:flex-row min-h-screen bg-slate-100 font-sans text-slate-800 relative" x-data="{
     sidebarOpen: false,
     entryModalOpen: false,
-    entryType: 'EXPENSE'
+    categoryModalOpen: false,
+    entryType: 'EXPENSE',
+    newCategoryName: '',
+    newCategoryType: 'EXPENSE',
+    categoryMsg: '',
+    categoryError: '',
+
+    async createCategory() {
+        if (!this.newCategoryName.trim()) {
+            this.categoryError = 'ক্যাটাগরির নাম লিখুন!';
+            return;
+        }
+        this.categoryError = '';
+        this.categoryMsg = '';
+
+        const formData = new FormData();
+        formData.append('category_name', this.newCategoryName.trim());
+        formData.append('category_type', this.newCategoryType);
+
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+        if (csrfToken) formData.append('csrfmiddlewaretoken', csrfToken);
+
+        try {
+            const res = await fetch('{% url 'ledger:add_category' %}', {
+                method: 'POST',
+                body: formData,
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            const data = await res.json();
+            if (res.ok && data.status === 'success') {
+                this.categoryMsg = data.message;
+                // Add to select dropdown
+                const sel = document.getElementById('ledger-category-select');
+                if (sel) {
+                    const opt = document.createElement('option');
+                    opt.value = data.category.id;
+                    opt.text = data.category.name + (data.category.type === 'INCOME' ? ' (আয়)' : ' (ব্যয়)');
+                    opt.selected = true;
+                    sel.appendChild(opt);
+                }
+                this.newCategoryName = '';
+                setTimeout(() => {
+                    this.categoryModalOpen = false;
+                    this.categoryMsg = '';
+                }, 1000);
+            } else {
+                this.categoryError = data.message || 'ক্যাটাগরি তৈরিতে ত্রুটি হয়েছে।';
+            }
+        } catch(e) {
+            this.categoryError = 'সার্ভার যোগাযোগে সমস্যা হয়েছে।';
+        }
+    }
 }">
 
     <!-- Mobile Top Navigation Header -->
-    <div class="lg:hidden absolute top-0 left-0 right-0 h-14 bg-white border-b border-slate-200 z-40 flex items-center justify-between px-4 shadow-sm">
+    <div class="lg:hidden sticky top-0 left-0 right-0 h-14 bg-white border-b border-slate-200 z-40 flex items-center justify-between px-4 shadow-xs shrink-0">
         <div class="flex items-center space-x-3">
             <button @click="sidebarOpen = true" class="p-2 rounded-xl text-slate-600 hover:bg-slate-100 active:scale-95" title="মেনু খুলুন">
                 <span class="text-xl leading-none">☰</span>
             </button>
             <div class="flex items-center space-x-2">
                 <span class="text-xl">📒</span>
-                <span class="font-extrabold text-sm text-slate-800">ক্যাশ বুক ও লেজার</span>
+                <span class="font-extrabold text-sm text-slate-800">আয়-ব্যয় লেজার খাতা</span>
             </div>
         </div>
 
-        <button @click="entryModalOpen = true" class="px-3 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-xl shadow-sm">
-            + এন্ট্রি
+        <button @click="entryModalOpen = true" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs active:scale-95">
+            + নতুন এন্ট্রি
         </button>
     </div>
 
@@ -30,158 +89,180 @@
     <div x-show="sidebarOpen" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 lg:hidden" @click="sidebarOpen = false" x-cloak x-transition.opacity></div>
 
     <!-- Mobile Drawer Container -->
-    <div x-show="sidebarOpen" x-cloak class="fixed inset-y-0 left-0 z-50 w-72 lg:hidden">
+    <div x-show="sidebarOpen" x-cloak class="fixed inset-y-0 left-0 z-50 w-72 lg:hidden shadow-2xl">
         {% include "partials/tenant_sidebar.html" with active_tab="ledger" %}
     </div>
 
     <!-- Desktop Sidebar -->
-    <div class="dashboard-sidebar-wrapper hidden lg:block shrink-0 h-screen">
+    <div class="dashboard-sidebar-wrapper hidden lg:block shrink-0 min-h-screen sticky top-0 h-screen">
         {% include "partials/tenant_sidebar.html" with active_tab="ledger" %}
     </div>
 
     <!-- Main Workspace Area -->
-    <main class="flex-1 min-h-0 flex flex-col overflow-hidden pt-14 lg:pt-0">
+    <main class="flex-1 min-h-0 flex flex-col min-w-0 bg-slate-100">
         <!-- Top Bar (Desktop) -->
-        <header class="hidden lg:flex h-16 bg-white border-b border-slate-200 px-8 items-center justify-between shrink-0 shadow-sm">
+        <header class="hidden lg:flex bg-white border-b border-slate-200 sticky top-0 z-20 px-8 py-3.5 items-center justify-between shadow-xs shrink-0">
             <div>
-                <h2 class="text-lg font-bold text-slate-900">দৈনিক আয়-ব্যয় ও ক্যাশ বুক (Cash Ledger)</h2>
-                <p class="text-xs text-slate-500">দোকানের যাবতীয় খরচ, ওষুধ কোম্পানির পেমেন্ট ও দৈনিক ব্যালেন্স</p>
+                <h2 class="text-base sm:text-lg font-black text-slate-900 flex items-center space-x-2">
+                    <span>📒 দৈনিক আয় ও ব্যয় হিসাব খাতা</span>
+                </h2>
+                <p class="text-xs text-slate-500 font-medium">{{ tenant.name }} • ফার্মেসির যাবতীয় খরচ ও আয়ের সঠিক হিসাব</p>
             </div>
 
-            <button @click="entryModalOpen = true" class="px-4 py-2 bg-cyan-700 hover:bg-cyan-800 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-sm transition-colors active:scale-95">
-                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                </svg>
-                <span>নতুন হিসাব এন্ট্রি করুন</span>
-            </button>
+            <div class="flex items-center space-x-2.5">
+                <button @click="categoryModalOpen = true" class="px-3.5 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-xs transition-colors active:scale-95">
+                    <span>⚙️</span>
+                    <span>নতুন ক্যাটাগরি তৈরি</span>
+                </button>
+                <button @click="entryModalOpen = true" class="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold rounded-xl text-xs flex items-center gap-1.5 shadow-md shadow-emerald-600/25 transition-all active:scale-95">
+                    <span>➕</span>
+                    <span>হিসাব এন্ট্রি করুন</span>
+                </button>
+            </div>
         </header>
 
-        <!-- KPI Summary Cards -->
-        <section class="p-4 sm:p-6 pb-0 grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-5 shrink-0">
-            <div class="bg-white p-4 sm:p-5 rounded-2xl border border-emerald-100 shadow-sm flex items-center justify-between">
-                <div>
-                    <p class="text-[11px] sm:text-xs font-bold text-emerald-600 uppercase tracking-wider">আজকের মোট আয়</p>
-                    <h3 class="text-xl sm:text-2xl font-black text-emerald-600 mt-1 font-mono">৳{{ today_income|floatformat:2 }}</h3>
-                </div>
-                <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-lg">
-                    📈
-                </div>
+        <!-- Main Container -->
+        <div class="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-6 lg:p-8 space-y-4 sm:space-y-6">
+
+            <!-- Mobile Buttons -->
+            <div class="grid grid-cols-2 gap-2 lg:hidden">
+                <button @click="categoryModalOpen = true" class="py-2 px-2 text-center rounded-xl bg-white border border-slate-200 text-slate-700 text-xs font-bold shadow-xs flex items-center justify-center space-x-1">
+                    <span>⚙️ নতুন ক্যাটাগরি</span>
+                </button>
+                <button @click="entryModalOpen = true" class="py-2 px-2 text-center rounded-xl bg-emerald-600 text-white text-xs font-bold shadow-xs flex items-center justify-center space-x-1">
+                    <span>➕ হিসাব এন্ট্রি</span>
+                </button>
             </div>
 
-            <div class="bg-white p-4 sm:p-5 rounded-2xl border border-rose-100 shadow-sm flex items-center justify-between">
-                <div>
-                    <p class="text-[11px] sm:text-xs font-bold text-rose-500 uppercase tracking-wider">আজকের মোট খরচ</p>
-                    <h3 class="text-xl sm:text-2xl font-black text-rose-600 mt-1 font-mono">৳{{ today_expense|floatformat:2 }}</h3>
-                </div>
-                <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold text-lg">
-                    📉
-                </div>
-            </div>
-
-            <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
-                <div>
-                    <p class="text-[11px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider">আজকের নিট ক্যাশ</p>
-                    <h3 class="text-xl sm:text-2xl font-black {% if net_balance >= 0 %}text-slate-800{% else %}text-rose-600{% endif %} mt-1 font-mono">
-                        ৳{{ net_balance|floatformat:2 }}
-                    </h3>
-                </div>
-                <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-lg">
-                    💰
-                </div>
-            </div>
-        </section>
-
-        <!-- Search & Filter Controls -->
-        <div class="p-4 sm:p-6 pb-3 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shrink-0">
-            <div class="flex-1 max-w-md relative">
-                <input
-                    type="text"
-                    name="q"
-                    value="{{ search_query }}"
-                    hx-get="{% url 'ledger:dashboard' %}"
-                    hx-trigger="keyup changed delay:300ms"
-                    hx-target="#ledger-table-container"
-                    placeholder="বিবরণ বা ভাউচার নং দিয়ে খুঁজুন..."
-                    class="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 pl-10 text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-500 shadow-sm"
-                />
-                <svg class="w-4 h-4 text-slate-400 absolute left-3.5 top-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                </svg>
-            </div>
-
-            <div class="flex items-center gap-2">
-                <a href="{% url 'ledger:dashboard' %}?type=ALL" class="flex-1 sm:flex-initial text-center px-3 py-2 rounded-xl text-xs font-bold {% if selected_type == 'ALL' %}bg-slate-900 text-white{% else %}bg-white border border-slate-200 text-slate-600 hover:bg-slate-50{% endif %}">
-                    সব
-                </a>
-                <a href="{% url 'ledger:dashboard' %}?type=INCOME" class="flex-1 sm:flex-initial text-center px-3 py-2 rounded-xl text-xs font-bold {% if selected_type == 'INCOME' %}bg-emerald-600 text-white{% else %}bg-white border border-slate-200 text-emerald-600 hover:bg-emerald-50{% endif %}">
-                    আয়
-                </a>
-                <a href="{% url 'ledger:dashboard' %}?type=EXPENSE" class="flex-1 sm:flex-initial text-center px-3 py-2 rounded-xl text-xs font-bold {% if selected_type == 'EXPENSE' %}bg-rose-600 text-white{% else %}bg-white border border-slate-200 text-rose-600 hover:bg-rose-50{% endif %}">
-                    ব্যয়
-                </a>
-            </div>
-        </div>
-
-        <!-- Ledger Table Area -->
-        <div class="flex-1 min-h-0 px-4 sm:px-6 pb-6 overflow-y-auto">
-            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-x-auto" id="ledger-table-container">
+            <!-- Ledger Table Area -->
+            <div id="ledger-content-area" class="space-y-6">
                 {% include "ledger/partials/ledger_table.html" %}
             </div>
         </div>
     </main>
 
-    <!-- Modal: Add New Ledger Entry -->
+    <!-- Modal 1: Add New Ledger Entry -->
     <div x-show="entryModalOpen" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" x-cloak>
         <div @click.away="entryModalOpen = false" class="bg-white rounded-t-3xl sm:rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-slate-100 pb-safe max-h-[90dvh] overflow-y-auto">
-            <div class="flex items-center justify-between pb-4 border-b border-slate-100">
-                <h3 class="text-sm font-bold text-slate-900">নতুন আয় বা ব্যয় এন্ট্রি</h3>
-                <button @click="entryModalOpen = false" class="text-slate-400 hover:text-slate-600 font-bold text-lg">&times;</button>
+            <div class="flex items-center justify-between pb-3.5 border-b border-slate-100">
+                <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                    <span>📝</span>
+                    <span>নতুন আয় বা ব্যয় এন্ট্রি</span>
+                </h3>
+                <button @click="entryModalOpen = false" class="text-slate-400 hover:text-slate-600 font-bold text-lg p-1">&times;</button>
             </div>
-            <form action="{% url 'ledger:add_entry' %}" method="POST" class="mt-4 space-y-4">
+            
+            <form action="{% url 'ledger:add_entry' %}" method="POST" hx-post="{% url 'ledger:add_entry' %}" hx-target="#ledger-content-area" hx-swap="outerHTML" @htmx:after-request="entryModalOpen = false" class="mt-4 space-y-3.5">
                 {% csrf_token %}
+                
+                <!-- Type Selection -->
                 <div class="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl">
                     <button type="button" @click="entryType = 'EXPENSE'" :class="entryType === 'EXPENSE' ? 'bg-rose-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'" class="py-2 text-xs font-bold rounded-lg transition-all">
-                        ব্যয় / খরচ (Expense)
+                        ব্যয় / খরচ
                     </button>
                     <button type="button" @click="entryType = 'INCOME'" :class="entryType === 'INCOME' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'" class="py-2 text-xs font-bold rounded-lg transition-all">
-                        অন্যান্য আয় (Income)
+                        অন্যান্য আয়
                     </button>
                 </div>
-                <input type="hidden" name="type" :value="entryType">
+                <input type="hidden" name="entry_type" :value="entryType">
 
+                <!-- Category with Quick Add Link -->
                 <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1">ক্যাটাগরি *</label>
-                    <select name="category" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-cyan-500 focus:outline-none">
+                    <div class="flex items-center justify-between mb-1">
+                        <label class="text-xs font-bold text-slate-700">ক্যাটাগরি *</label>
+                        <button type="button" @click="categoryModalOpen = true" class="text-[11px] font-bold text-cyan-700 hover:text-cyan-800 flex items-center gap-0.5">
+                            <span>➕ নতুন ক্যাটাগরি তৈরি</span>
+                        </button>
+                    </div>
+                    <select name="category_id" id="ledger-category-select" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
                         {% for cat in categories %}
-                        <option value="{{ cat.id }}">{{ cat.name }} ({{ cat.get_type_display }})</option>
+                        <option value="{{ cat.id }}">{{ cat.name }} ({{ cat.get_category_type_display }})</option>
                         {% endfor %}
                     </select>
                 </div>
 
+                <!-- Title / Description -->
                 <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1">টাকার পরিমাণ (৳) *</label>
-                    <input type="number" step="0.01" name="amount" required placeholder="0.00" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-black font-mono text-slate-900 focus:ring-2 focus:ring-cyan-500 focus:outline-none">
+                    <label class="block text-xs font-bold text-slate-700 mb-1">বিবরণ / শিরোনাম *</label>
+                    <input type="text" name="title" required placeholder="যেমন: দোকান ভাড়া পরিশোধ / বিদ্যুৎ বিল" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold focus:ring-2 focus:ring-emerald-500 focus:outline-none">
                 </div>
 
+                <!-- Amount & Date -->
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">টাকার পরিমাণ *</label>
+                        <input type="number" step="0.01" name="amount" required placeholder="0.00" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-black font-mono text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">তারিখ</label>
+                        <input type="date" name="entry_date" value="{{ today|date:'Y-m-d' }}" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                    </div>
+                </div>
+
+                <!-- Payment Method -->
                 <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1">পেমেন্ট মেথড *</label>
-                    <select name="payment_method" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-cyan-500 focus:outline-none">
-                        <option value="CASH">ক্যাশ (Cash Counter)</option>
-                        <option value="BKASH">বিকাশ (bKash)</option>
-                        <option value="NAGAD">নগদ (Nagad)</option>
-                        <option value="ROCKET">রকেট (Rocket)</option>
-                        <option value="BANK">ব্যাংক একাউন্ট (Bank Transfer)</option>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">পেমেন্ট মাধ্যম *</label>
+                    <select name="payment_method" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                        <option value="CASH">নগদ টাকা</option>
+                        <option value="BKASH">বিকাশ</option>
+                        <option value="NAGAD">নগদ</option>
+                        <option value="ROCKET">রকেট</option>
+                        <option value="BANK">ব্যাংক অ্যাকাউন্ট</option>
+                        <option value="CHEQUE">চেক</option>
+                    </select>
+                </div>
+
+                <!-- Recipient or Payer -->
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">প্রাপক / প্রদানকারীর নাম (ঐচ্ছিক)</label>
+                    <input type="text" name="recipient_or_payer" placeholder="যেমন: বাড়িওয়ালা / কোম্পানি প্রতিনিধি" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                </div>
+
+                <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                    <button type="button" @click="entryModalOpen = false" class="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl text-xs hover:bg-slate-200">বাতিল</button>
+                    <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-xl text-xs shadow-md shadow-emerald-600/25 active:scale-95">সংরক্ষণ করুন 💾</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal 2: Create Custom Category -->
+    <div x-show="categoryModalOpen" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" x-cloak>
+        <div @click.away="categoryModalOpen = false" class="bg-white rounded-t-3xl sm:rounded-2xl max-w-sm w-full p-5 sm:p-6 shadow-2xl border border-slate-100 pb-safe">
+            <div class="flex items-center justify-between pb-3.5 border-b border-slate-100">
+                <h3 class="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                    <span>⚙️</span>
+                    <span>নতুন কাস্টম ক্যাটাগরি তৈরি</span>
+                </h3>
+                <button @click="categoryModalOpen = false" class="text-slate-400 hover:text-slate-600 font-bold text-lg p-1">&times;</button>
+            </div>
+
+            <!-- Success / Error Alert -->
+            <template x-if="categoryMsg">
+                <div class="mt-3 p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold" x-text="categoryMsg"></div>
+            </template>
+            <template x-if="categoryError">
+                <div class="mt-3 p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold" x-text="categoryError"></div>
+            </template>
+
+            <form @submit.prevent="createCategory()" class="mt-3.5 space-y-3.5">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">ক্যাটাগরির ধরন *</label>
+                    <select x-model="newCategoryType" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                        <option value="EXPENSE">ব্যয় / খরচ</option>
+                        <option value="INCOME">আয়</option>
                     </select>
                 </div>
 
                 <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1">বিবরণ / নোট</label>
-                    <input type="text" name="note" placeholder="যেমন: স্কয়ার ফার্মার বিল পরিশোধ / বিদ্যুৎ বিল" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs focus:ring-2 focus:ring-cyan-500 focus:outline-none">
+                    <label class="block text-xs font-bold text-slate-700 mb-1">ক্যাটাগরির নাম *</label>
+                    <input type="text" x-model="newCategoryName" placeholder="যেমন: দোকান ডেকোরেশন, জেনারেটর তেল" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold focus:ring-2 focus:ring-emerald-500 focus:outline-none">
                 </div>
 
-                <div class="flex justify-end gap-2 pt-2">
-                    <button type="button" @click="entryModalOpen = false" class="px-4 py-2.5 bg-slate-100 text-slate-700 font-bold rounded-xl text-xs hover:bg-slate-200">বাতিল</button>
-                    <button type="submit" class="px-5 py-2.5 bg-cyan-700 text-white font-bold rounded-xl text-xs hover:bg-cyan-800 shadow-sm active:scale-95">সংরক্ষণ করুন</button>
+                <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                    <button type="button" @click="categoryModalOpen = false" class="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl text-xs hover:bg-slate-200">বাতিল</button>
+                    <button type="submit" class="px-5 py-2 bg-cyan-700 hover:bg-cyan-800 text-white font-extrabold rounded-xl text-xs shadow-md shadow-cyan-700/25 active:scale-95">ক্যাটাগরি তৈরি করুন ➕</button>
                 </div>
             </form>
         </div>

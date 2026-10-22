@@ -12,55 +12,57 @@ from core.decorators import tenant_user_required
 _LEDGER_SEEDED = False
 
 def ensure_default_ledger_categories():
-    """Initializes standard retail pharmacy income and expense categories."""
+    """ডিফল্ট ফার্মেসি আয় ও ব্যয়ের ক্যাটাগরি নিশ্চিত করে।"""
     global _LEDGER_SEEDED
     if _LEDGER_SEEDED:
         return
-    if LedgerCategory.objects.exists():
+    if LedgerCategory.objects.filter(is_system_default=True).exists():
         _LEDGER_SEEDED = True
         return
     _LEDGER_SEEDED = True
     default_expenses = [
-        ("Shop Rent", "দোকান ভাড়া"),
-        ("Staff Salary & Daily Wage", "কর্মচারীর বেতন ও মজুরি"),
-        ("Electricity & Utility Bill", "বিদ্যুৎ ও ইউটিলিটি বিল"),
-        ("Pharmaceutical Supplier Payment", "ঔষধ কোম্পানি / সাপ্লায়ার পেমেন্ট"),
-        ("Daily Snacks & Refreshment", "দৈনিক চা-নাস্তা ও আপ্যায়ন"),
-        ("Packaging & Polythene Bags", "পলিথিন ও প্যাকেজিং খরচ"),
-        ("Trade & Drug License Renew", "ড্রাগ ও ট্রেড লাইসেন্স নবায়ন"),
-        ("Software & Internet Bill", "ইন্টারনেট ও সফটওয়্যার বিল"),
-        ("Shop Maintenance & Cleaning", "দোকান মেরামত ও পরিষ্কার পরিচ্ছন্নতা"),
-        ("Transportation & Delivery", "যাতায়াত ও ডেলিভারি খরচ"),
-        ("Damaged / Expired Drug Loss", "মেয়াদোত্তীর্ণ ঔষধের ক্ষতি"),
-        ("Miscellaneous Expense", "অন্যান্য খরচ"),
+        "দোকান ভাড়া",
+        "কর্মচারীর বেতন ও মজুরি",
+        "বিদ্যুৎ ও ইউটিলিটি বিল",
+        "ওষুধ কোম্পানি / সাপ্লায়ার পেমেন্ট",
+        "দৈনিক চা-নাস্তা ও আপ্যায়ন",
+        "পলিথিন ও প্যাকেজিং খরচ",
+        "ড্রাগ ও ট্রেড লাইসেন্স নবায়ন",
+        "ইন্টারনেট ও সফটওয়্যার বিল",
+        "দোকান মেরামত ও পরিচ্ছন্নতা",
+        "যাতায়াত ও ডেলিভারি খরচ",
+        "মেয়াদোত্তীর্ণ ওষুধের ক্ষতি",
+        "অন্যান্য খরচ",
     ]
-    for name, bn in default_expenses:
+    for bn in default_expenses:
         LedgerCategory.objects.get_or_create(
-            name=name,
+            name=bn,
             category_type="EXPENSE",
-            defaults={"name_bn": bn, "is_system_default": True}
+            is_system_default=True,
+            defaults={"name_bn": bn, "is_active": True}
         )
 
     default_incomes = [
-        ("Daily OTC & Prescription Sales", "দৈনিক ঔষধ বিক্রয়"),
-        ("Customer Due Collection (Baki)", "বকেয়া আদায় (বাকি খাতা)"),
-        ("Supplier Return Refund", "কোম্পানি রিটার্ন রিফান্ড"),
-        ("Delivery & Service Charge", "ডেলিভারি ও সার্ভিস চার্জ"),
-        ("Owner Capital Investment", "মালিকের মূলধন বিনিয়োগ"),
-        ("Other Income", "অন্যান্য আয়"),
+        "দৈনিক ওষুধ বিক্রয়",
+        "বকেয়া আদায় (বাকি খাতা)",
+        "কোম্পানি রিটার্ন রিফান্ড",
+        "ডেলিভারি ও সার্ভিস চার্জ",
+        "মালিকের মূলধন বিনিয়োগ",
+        "অন্যান্য আয়",
     ]
-    for name, bn in default_incomes:
+    for bn in default_incomes:
         LedgerCategory.objects.get_or_create(
-            name=name,
+            name=bn,
             category_type="INCOME",
-            defaults={"name_bn": bn, "is_system_default": True}
+            is_system_default=True,
+            defaults={"name_bn": bn, "is_active": True}
         )
 
 
 @tenant_user_required
 def ledger_dashboard_view(request):
     """
-    Main Income & Expense Cash Book Ledger dashboard with tenant isolation.
+    আয় ও ব্যয় লেজার খাতা ড্যাশবোর্ড (সম্পূর্ণ বাংলায় ও টেন্যান্ট আইসোলেশন সহ)।
     """
     ensure_default_ledger_categories()
     tenant = getattr(request, "tenant", None)
@@ -72,7 +74,6 @@ def ledger_dashboard_view(request):
     if tenant:
         base_qs = base_qs.filter(tenant=tenant)
 
-    # Consolidated single query for Today's and Month's financial totals
     metrics = base_qs.aggregate(
         today_income=Sum("amount", filter=Q(entry_date=today, entry_type="INCOME")),
         today_expense=Sum("amount", filter=Q(entry_date=today, entry_type="EXPENSE")),
@@ -87,8 +88,13 @@ def ledger_dashboard_view(request):
     month_expense = metrics["month_expense"] or Decimal("0.00")
     month_net = month_income - month_expense
 
-    entries = base_qs.select_related("category", "recorded_by").all()[:50]
-    categories = LedgerCategory.objects.filter(is_active=True)
+    entries = base_qs.select_related("category", "recorded_by").all().order_by("-entry_date", "-created_at")[:60]
+    
+    # টেন্যান্টের নিজস্ব ক্যাটাগরি এবং সিস্টেম ডিফল্ট ক্যাটাগরি
+    cat_filter = Q(tenant__isnull=True)
+    if tenant:
+        cat_filter |= Q(tenant=tenant)
+    categories = LedgerCategory.objects.filter(cat_filter, is_active=True).order_by("category_type", "name")
 
     context = {
         "tenant": tenant,
@@ -109,7 +115,7 @@ def ledger_dashboard_view(request):
 @require_POST
 def ledger_add_entry_htmx(request):
     """
-    HTMX endpoint to quickly add an income or expense entry with tenant scoping.
+    দ্রুত আয় বা ব্যয় এন্ট্রি যোগ করার ব্যাকএন্ড।
     """
     tenant = getattr(request, "tenant", None)
     entry_type = request.POST.get("entry_type", "EXPENSE")
@@ -150,7 +156,7 @@ def ledger_add_entry_htmx(request):
     if tenant:
         base_qs = base_qs.filter(tenant=tenant)
 
-    entries = base_qs.select_related("category", "recorded_by").all()[:50]
+    entries = base_qs.select_related("category", "recorded_by").all().order_by("-entry_date", "-created_at")[:60]
     
     today_income = base_qs.filter(entry_date=today, entry_type="INCOME").aggregate(s=Sum("amount"))["s"] or Decimal("0.00")
     today_expense = base_qs.filter(entry_date=today, entry_type="EXPENSE").aggregate(s=Sum("amount"))["s"] or Decimal("0.00")
@@ -170,7 +176,7 @@ def ledger_add_entry_htmx(request):
 @require_POST
 def ledger_delete_entry_htmx(request, entry_id):
     """
-    Deletes a ledger entry ensuring tenant boundary.
+    লেজার এন্ট্রি মুছে ফেলার ব্যাকএন্ড।
     """
     tenant = getattr(request, "tenant", None)
     if tenant and not request.user.is_superuser:
@@ -180,16 +186,82 @@ def ledger_delete_entry_htmx(request, entry_id):
     entry.delete()
 
     today = timezone.now().date()
-    entries = IncomeExpenseEntry.objects.select_related("category", "recorded_by").all()[:50]
+    base_qs = IncomeExpenseEntry.objects.all()
+    if tenant:
+        base_qs = base_qs.filter(tenant=tenant)
+
+    entries = base_qs.select_related("category", "recorded_by").all().order_by("-entry_date", "-created_at")[:60]
     
-    today_income = IncomeExpenseEntry.objects.filter(entry_date=today, entry_type="INCOME").aggregate(s=Sum("amount"))["s"] or Decimal("0.00")
-    today_expense = IncomeExpenseEntry.objects.filter(entry_date=today, entry_type="EXPENSE").aggregate(s=Sum("amount"))["s"] or Decimal("0.00")
+    today_income = base_qs.filter(entry_date=today, entry_type="INCOME").aggregate(s=Sum("amount"))["s"] or Decimal("0.00")
+    today_expense = base_qs.filter(entry_date=today, entry_type="EXPENSE").aggregate(s=Sum("amount"))["s"] or Decimal("0.00")
     today_net = today_income - today_expense
 
     context = {
+        "tenant": tenant,
         "entries": entries,
         "today_income": today_income,
         "today_expense": today_expense,
         "today_net": today_net,
     }
     return render(request, "ledger/partials/ledger_table.html", context)
+
+
+@tenant_user_required
+@require_POST
+def ledger_create_category_view(request):
+    """
+    টেন্যান্টের নিজের কাস্টম আয় বা ব্যয়ের ক্যাটাগরি তৈরি করার অপশন।
+    """
+    tenant = getattr(request, "tenant", None)
+    name = request.POST.get("category_name", "").strip()
+    cat_type = request.POST.get("category_type", "EXPENSE")
+
+    if not name:
+        return JsonResponse({"status": "error", "message": "ক্যাটাগরির নাম দেওয়া আবশ্যক।"}, status=400)
+
+    # Check if duplicate for this tenant
+    existing = LedgerCategory.objects.filter(
+        Q(tenant=tenant) | Q(is_system_default=True),
+        name__iexact=name,
+        category_type=cat_type
+    ).first()
+    if existing:
+        return JsonResponse({"status": "error", "message": "এই নামের ক্যাটাগরি ইতিমধ্যেই বিদ্যমান রয়েছে।"}, status=400)
+
+    category = LedgerCategory.objects.create(
+        tenant=tenant,
+        name=name,
+        name_bn=name,
+        category_type=cat_type,
+        is_system_default=False,
+        is_active=True
+    )
+
+    return JsonResponse({
+        "status": "success",
+        "message": f"'{name}' ক্যাটাগরি সফলভাবে তৈরি হয়েছে!",
+        "category": {
+            "id": str(category.id),
+            "name": category.name,
+            "type": category.category_type,
+        }
+    })
+
+
+@tenant_user_required
+@require_POST
+def ledger_delete_category_view(request, category_id):
+    """
+    টেন্যান্টের নিজস্ব কাস্টম ক্যাটাগরি মুছে ফেলার অপশন।
+    """
+    tenant = getattr(request, "tenant", None)
+    cat = get_object_or_404(LedgerCategory, id=category_id, tenant=tenant)
+    if cat.is_system_default:
+        return JsonResponse({"status": "error", "message": "সিস্টেম ডিফল্ট ক্যাটাগরি মুছে ফেলা যাবে না।"}, status=403)
+
+    cat_name = cat.name
+    cat.delete()
+    return JsonResponse({
+        "status": "success",
+        "message": f"'{cat_name}' ক্যাটাগরি সফলভাবে মুছে ফেলা হয়েছে!"
+    })

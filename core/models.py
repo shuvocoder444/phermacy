@@ -127,10 +127,11 @@ class LedgerCategory(models.Model):
     Categories for income and expenses (e.g. Shop Rent, Salary, Supplier Payment, Utilities, Sales).
     """
     CATEGORY_TYPES = (
-        ("INCOME", "Income (আয়)"),
-        ("EXPENSE", "Expense (ব্যয়)"),
+        ("INCOME", "আয়"),
+        ("EXPENSE", "ব্যয়"),
     )
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey("Tenant", on_delete=models.CASCADE, null=True, blank=True, related_name="ledger_categories")
     name = models.CharField(max_length=100, db_index=True)
     name_bn = models.CharField(max_length=150, blank=True, null=True, help_text="বাংলা নাম")
     category_type = models.CharField(max_length=10, choices=CATEGORY_TYPES, default="EXPENSE")
@@ -151,16 +152,16 @@ class IncomeExpenseEntry(models.Model):
     Pharmacy cash book ledger tracking daily income and operational expenses.
     """
     ENTRY_TYPES = (
-        ("INCOME", "Income (আয়)"),
-        ("EXPENSE", "Expense (ব্যয়)"),
+        ("INCOME", "আয়"),
+        ("EXPENSE", "ব্যয়"),
     )
     PAYMENT_METHODS = (
-        ("CASH", "Cash Drawer (ক্যাশ ড্রয়ার)"),
-        ("BKASH", "bKash Merchant"),
-        ("NAGAD", "Nagad"),
-        ("ROCKET", "Rocket"),
-        ("BANK", "Bank Account (ব্যাংক)"),
-        ("CHEQUE", "Cheque (চেক)"),
+        ("CASH", "নগদ টাকা"),
+        ("BKASH", "বিকাশ"),
+        ("NAGAD", "নগদ"),
+        ("ROCKET", "রকেট"),
+        ("BANK", "ব্যাংক অ্যাকাউন্ট"),
+        ("CHEQUE", "চেক"),
     )
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, null=True, blank=True, related_name="ledger_entries")

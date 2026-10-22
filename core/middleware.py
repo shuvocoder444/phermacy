@@ -50,5 +50,7 @@ class TenantMiddleware(MiddlewareMixin):
         # 4. Default Fallback (Only if explicitly authenticated or domain matched)
         if not tenant and user and user.is_authenticated and user.is_superuser:
             tenant = Tenant.objects.filter(is_active=True).first()
+            if tenant and hasattr(request, "session"):
+                request.session["active_tenant_id"] = str(tenant.id)
 
         request.tenant = tenant

@@ -19,8 +19,8 @@
                     📦
                 </div>
                 <div>
-                    <h3 class="font-extrabold text-slate-800 text-base">নতুন ব্যাচ স্টক ইনওয়ার্ড (Stock In)</h3>
-                    <p class="text-xs text-slate-500 font-medium">সাপ্লায়ার চালান বা ক্রয় অনুযায়ী ঔষধের স্টক সিস্টেমে এন্ট্রি দিন</p>
+                    <h3 class="font-extrabold text-slate-800 text-base">নতুন ব্যাচ স্টক যোগ</h3>
+                    <p class="text-xs text-slate-500 font-medium">সাপ্লায়ার চালান বা ক্রয় অনুযায়ী ওষুধের স্টক সিস্টেমে যুক্ত করুন</p>
                 </div>
             </div>
             <button 
@@ -55,7 +55,7 @@
             <!-- 1. Live Medicine Autocomplete Search -->
             <div class="relative">
                 <label class="block text-xs font-bold text-slate-700 mb-1">
-                    ঔষধের নাম (Brand Name) <span class="text-rose-500">*</span>
+                    ওষুধের নাম <span class="text-rose-500">*</span>
                 </label>
                 <div class="relative">
                     <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 text-sm pointer-events-none">💊</span>
@@ -96,8 +96,8 @@
                                 <div class="text-[10px] text-slate-500 truncate" x-text="drug.generic + ' • ' + drug.manufacturer"></div>
                             </div>
                             <div class="text-right shrink-0">
-                                <div class="text-xs font-mono font-bold text-emerald-700" x-text="'MRP ৳' + drug.unit_mrp"></div>
-                                <div class="text-[10px] font-mono text-slate-400" x-text="'TP ৳' + drug.unit_tp"></div>
+                                <div class="text-xs font-mono font-bold text-emerald-700" x-text="'বিক্রয় ৳' + drug.unit_mrp"></div>
+                                <div class="text-[10px] font-mono text-slate-400" x-text="'ক্রয় ৳' + drug.unit_tp"></div>
                             </div>
                         </div>
                     </template>
@@ -120,7 +120,7 @@
                 <div>
                     <div class="flex items-center justify-between mb-1">
                         <label class="text-xs font-bold text-slate-700">
-                            ব্যাচ নম্বর (Batch No) <span class="text-rose-500">*</span>
+                            ব্যাচ নম্বর <span class="text-rose-500">*</span>
                         </label>
                         <button 
                             type="button" 
@@ -160,7 +160,7 @@
             <!-- 4. Stock Quantity with Instant Steppers -->
             <div>
                 <label class="block text-xs font-bold text-slate-700 mb-1">
-                    স্টক সংখ্যা (Inward Quantity - পিস) <span class="text-rose-500">*</span>
+                    মজুদ স্টক সংখ্যা (পিস) <span class="text-rose-500">*</span>
                 </label>
                 <div class="flex items-center space-x-2">
                     <button 
@@ -211,7 +211,7 @@
             <div class="grid grid-cols-2 gap-3 bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80">
                 <div>
                     <label class="block text-[11px] font-bold text-slate-700 mb-1">
-                        কেনা দর (Trade Price TP ৳)
+                        কেনা দর (Trade Price ক্রয় ৳)
                     </label>
                     <input 
                         type="number" 
@@ -223,7 +223,7 @@
                 <div>
                     <div class="flex items-center justify-between mb-1">
                         <label class="text-[11px] font-bold text-slate-700">
-                            খুচরা বিক্রয় দর (MRP ৳)
+                            খুচরা বিক্রয় দর (বিক্রয় ৳)
                         </label>
                         <span 
                             x-show="profitMargin > 0" 
@@ -474,7 +474,7 @@ function stockInController() {
                         playCartAddSound();
                     }
 
-                    this.successMsg = data.message || 'স্টক সফলভাবে ইনওয়ার্ড হয়েছে!';
+                    this.successMsg = data.message || 'স্টক সফলভাবে যুক্ত হয়েছে!';
                     
                     // If on POS screen and new batch created, automatically add it directly to active POS cart!
                     if (data.batch_id && typeof addDrugBatch === 'function') {
